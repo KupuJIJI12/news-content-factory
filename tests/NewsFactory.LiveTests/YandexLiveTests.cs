@@ -7,8 +7,7 @@ using NewsFactory.TestSupport;
 
 namespace NewsFactory.LiveTests;
 
-[Collection("db")]
-public class YandexLiveTests(PostgresFixture db)
+public class YandexLiveTests
 {
     private sealed class SimpleFactory : IHttpClientFactory
     {
@@ -19,7 +18,9 @@ public class YandexLiveTests(PostgresFixture db)
     public async Task Rewrites_fixture_story()
     {
         Env.Require("YANDEX_API_KEY", "YANDEX_FOLDER_ID");
-        await db.ResetAsync();
+        // Database is created only after the variables check, so the test skips cleanly without Docker/Postgres.
+        var db = new PostgresFixture();
+        await db.InitializeAsync();
         var config = new ConfigurationBuilder().AddEnvironmentVariables().Build();
         await using var ctx = db.CreateContext();
         await SeedData.ApplyAsync(ctx, config, default);
@@ -43,5 +44,6 @@ public class YandexLiveTests(PostgresFixture db)
 
         Assert.InRange(score.Score, 1, 10);
         Assert.NotEmpty(rewrite.Title);
+        await db.DisposeAsync();
     }
 }
