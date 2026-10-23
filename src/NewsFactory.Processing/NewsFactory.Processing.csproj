@@ -1,5 +1,8 @@
 <Project Sdk="Microsoft.NET.Sdk">
   <ItemGroup>
+    <PackageReference Include="Hangfire.Core" />
+  </ItemGroup>
+  <ItemGroup>
     <ProjectReference Include="..\..\src\NewsFactory.Domain\NewsFactory.Domain.csproj" />
     <ProjectReference Include="..\..\src\NewsFactory.Infrastructure\NewsFactory.Infrastructure.csproj" />
     <ProjectReference Include="..\..\src\NewsFactory.Llm\NewsFactory.Llm.csproj" />
