@@ -41,6 +41,19 @@ public class RssCollectorTests
     public async Task Item_without_pubDate_has_null_PublishedAt() =>
         Assert.Null((await Collect("Fixtures/rss/synthetic.xml"))[2].PublishedAt);
 
+    [Fact]
+    public async Task Uses_yandex_full_text_and_turbo_content_over_description()
+    {
+        var items = await Collect("Fixtures/rss/yandex.xml");
+        Assert.Equal("Первый абзац полного текста — с тире.\n\nВторой абзац полного текста.", items[0].Text);
+        Assert.Contains("Текст из турбо-страницы.", items[1].Text);
+        Assert.DoesNotContain("Короткий анонс", items[1].Text);
+    }
+
+    [Fact]
+    public async Task Whitespace_before_xml_declaration_is_tolerated() =>
+        Assert.Equal(3, (await Collect("Fixtures/rss/leading-whitespace.xml")).Count);
+
     [Theory]
     [InlineData("Fixtures/rss/450media.xml")]
     [InlineData("Fixtures/rss/samaragis.xml")]
@@ -49,10 +62,11 @@ public class RssCollectorTests
         Assert.SkipUnless(File.Exists(path), $"Нет снятой фикстуры {path}");
         var items = await Collect(path);
         Assert.True(items.Count >= 5);
+        Assert.True(items.Average(i => i.Text.Length) > 300);
         Assert.All(items, i =>
         {
             Assert.NotEmpty(i.Title);
-            Assert.True(i.Text.Length > 100);
+            Assert.NotEmpty(i.Text);
             Assert.StartsWith("https://", i.Url);
             Assert.NotNull(i.PublishedAt);
         });

@@ -62,13 +62,30 @@ public class HtmlCollectorTests
     }
 
     [Fact]
+    public async Task Articles_older_than_48h_by_list_date_are_not_downloaded()
+    {
+        var handler = new StubHttpHandler()
+            .MapPrefix("https://site.example/news/", _ => File("Fixtures/html/synthetic-article.html"))
+            .MapFile("https://site.example/news/", "Fixtures/html/synthetic-list.html", "text/html");
+        var fetcher = new PoliteHttpFetcher(new HttpClient(handler), new HostThrottle(new FakeTimeProvider(), TimeSpan.Zero));
+        var source = new Source { Type = SourceType.Html, Url = SyntheticConfig.ListUrl, Config = JsonSerializer.Serialize(SyntheticConfig, JsonSerializerOptions.Web) };
+        // now = 2026-10-23 18:00 по Самаре: 23.10 и 22.10 свежие, 21.10 (00:00) старше 48 ч
+        var now = new FakeTimeProvider(DateTimeOffset.Parse("2026-10-23T14:00:00Z"));
+        var items = await new HtmlCollector(fetcher, time: now).CollectAsync(source, default);
+        Assert.Equal(3, items.Count);
+        Assert.Equal("", items[2].Text);
+        Assert.Equal(3, handler.Requests.Count); // список + 2 статьи
+    }
+
+    [Fact]
     public async Task One_broken_article_does_not_fail_collection() =>
         Assert.Equal(2, (await Collect(SyntheticConfig, failing: "b.html")).Count);
 
+    // "capturedAt" — момент, относительно которого свежая хотя бы первая новость фикстуры
     [Theory]
-    [InlineData("otradny")]
-    [InlineData("63ru")]
-    public async Task Real_sites_parse_with_configured_selectors(string site)
+    [InlineData("otradny", "2026-10-23T17:00:00Z")]
+    [InlineData("63ru", "2026-09-28T12:00:00Z")]
+    public async Task Real_sites_parse_with_configured_selectors(string site, string capturedAtUtc)
     {
         var list = $"Fixtures/html/{site}-list.html";
         var article = $"Fixtures/html/{site}-article.html";
@@ -82,13 +99,17 @@ public class HtmlCollectorTests
             .MapFile(config.ListUrl, list, "text/html");
         var fetcher = new PoliteHttpFetcher(new HttpClient(handler), new HostThrottle(new FakeTimeProvider(), TimeSpan.Zero));
         var source = new Source { Type = SourceType.Html, Url = config.ListUrl, Config = JsonSerializer.Serialize(config, JsonSerializerOptions.Web) };
-        var items = await new HtmlCollector(fetcher).CollectAsync(source, default);
+        var capturedAt = DateTimeOffset.Parse(capturedAtUtc);
+        var items = await new HtmlCollector(fetcher, time: new FakeTimeProvider(capturedAt)).CollectAsync(source, default);
         Assert.NotEmpty(items);
         Assert.All(items, i =>
         {
             Assert.NotEmpty(i.Title);
             Assert.NotNull(i.PublishedAt);
-            Assert.True(i.Text.Length > 100);
+            Assert.StartsWith("https://", i.Url);
         });
+        var fresh = items.Where(i => i.PublishedAt >= capturedAt - HtmlCollector.MaxAge).ToList();
+        Assert.NotEmpty(fresh);
+        Assert.All(fresh, i => Assert.True(i.Text.Length > 100));
     }
 }

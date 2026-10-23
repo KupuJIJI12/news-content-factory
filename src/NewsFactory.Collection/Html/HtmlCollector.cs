@@ -10,10 +10,13 @@ using NewsFactory.Domain.Entities;
 
 namespace NewsFactory.Collection.Html;
 
-public sealed class HtmlCollector(IPageFetcher fetcher, ILogger<HtmlCollector>? logger = null) : ISourceCollector
+public sealed class HtmlCollector(IPageFetcher fetcher, ILogger<HtmlCollector>? logger = null, TimeProvider? time = null) : ISourceCollector
 {
     private static readonly TimeZoneInfo Samara = TimeZoneInfo.FindSystemTimeZoneById("Europe/Samara");
+    /// <summary>Items whose list date is older than this are returned without downloading the article.</summary>
+    public static readonly TimeSpan MaxAge = TimeSpan.FromHours(48);
     private readonly ILogger _log = (ILogger?)logger ?? NullLogger.Instance;
+    private readonly TimeProvider _time = time ?? TimeProvider.System;
 
     public SourceType Type => SourceType.Html;
 
@@ -32,6 +35,11 @@ public sealed class HtmlCollector(IPageFetcher fetcher, ILogger<HtmlCollector>? 
             if (href is null || !Uri.TryCreate(listPage.FinalUrl, href, out var articleUrl)) continue;
             var title = Clean((config.TitleSelector is null ? link : element.QuerySelector(config.TitleSelector))?.TextContent);
             var date = ParseDate(element, config);
+            if (date is { } d && d < _time.GetUtcNow() - MaxAge)
+            {
+                result.Add(new CollectedItem(articleUrl.ToString(), articleUrl.ToString(), title, "", date, []));
+                continue;
+            }
             try
             {
                 result.Add(await CollectArticleAsync(articleUrl, title, date, config, ct));

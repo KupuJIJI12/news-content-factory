@@ -14,20 +14,26 @@ public sealed partial class RssCollector(IPageFetcher fetcher) : ISourceCollecto
 {
     private static readonly XNamespace Content = "http://purl.org/rss/1.0/modules/content/";
     private static readonly XNamespace Media = "http://search.yahoo.com/mrss/";
+    private static readonly XNamespace Yandex = "http://news.yandex.ru";
+    private static readonly XNamespace Turbo = "http://turbo.yandex.ru";
 
     public SourceType Type => SourceType.Rss;
 
     public async Task<IReadOnlyList<CollectedItem>> CollectAsync(Source source, CancellationToken ct)
     {
         var page = await fetcher.GetAsync(new Uri(source.Url), ct);
-        using var reader = XmlReader.Create(new StringReader(page.Content), new XmlReaderSettings { DtdProcessing = DtdProcessing.Ignore });
+        using var reader = XmlReader.Create(new StringReader(page.Content.TrimStart()), new XmlReaderSettings { DtdProcessing = DtdProcessing.Ignore });
         var doc = XDocument.Load(reader);
         var result = new List<CollectedItem>();
         foreach (var item in doc.Descendants("item"))
         {
             var link = item.Element("link")?.Value.Trim() ?? "";
             var baseUri = Uri.TryCreate(link, UriKind.Absolute, out var l) ? l : page.FinalUrl;
-            var html = item.Element(Content + "encoded")?.Value ?? item.Element("description")?.Value ?? "";
+            var html = AsHtml(item.Element(Content + "encoded")?.Value
+                              ?? item.Element(Yandex + "full-text")?.Value
+                              ?? item.Element(Turbo + "content")?.Value
+                              ?? item.Element("description")?.Value
+                              ?? "");
             var guid = item.Element("guid")?.Value.Trim();
             result.Add(new CollectedItem(
                 ExternalId: string.IsNullOrEmpty(guid) ? link : guid,
@@ -39,6 +45,12 @@ public sealed partial class RssCollector(IPageFetcher fetcher) : ISourceCollecto
         }
         return result;
     }
+
+    /// <summary>Plain text with blank-line paragraphs (yandex:full-text) is wrapped into &lt;p&gt; so paragraphs survive.</summary>
+    private static string AsHtml(string text) =>
+        text.Contains('<')
+            ? text
+            : string.Concat(BlankLine().Split(text.Trim()).Select(p => "<p>" + p + "</p>"));
 
     private static List<string> Images(XElement item, string html, Uri baseUri)
     {
@@ -73,6 +85,9 @@ public sealed partial class RssCollector(IPageFetcher fetcher) : ISourceCollecto
             ? any.ToUniversalTime()
             : null;
     }
+
+    [GeneratedRegex(@"\r?\n\s*\r?\n")]
+    private static partial Regex BlankLine();
 
     [GeneratedRegex(@"\b(GMT|UTC|UT|Z)$")]
     private static partial Regex NamedZone();
