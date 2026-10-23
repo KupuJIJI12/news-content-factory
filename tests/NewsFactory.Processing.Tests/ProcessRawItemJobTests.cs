@@ -204,6 +204,18 @@ public class ProcessRawItemJobTests(PostgresFixture db)
     }
 
     [Fact]
+    public async Task Unexpected_llm_error_marks_item_failed_with_reason()
+    {
+        _llm.Throw(LlmTask.Relevance, new HttpRequestException("LLM недоступна"));
+        var (itemId, _) = await SeedAsync(c => TestData.RegionalSource(c));
+        await RunAsync(itemId);
+        await using var read = db.CreateContext();
+        var item = await read.RawItems.SingleAsync();
+        Assert.Equal(RawItemStatus.Failed, item.Status);
+        Assert.Contains("LLM недоступна", item.RelevanceReason);
+    }
+
+    [Fact]
     public async Task Already_processed_item_is_ignored()
     {
         var (itemId, _) = await SeedAsync(c => TestData.DedicatedSource(c));

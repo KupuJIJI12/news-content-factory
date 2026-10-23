@@ -81,6 +81,10 @@ internal sealed class PublicationConfiguration : IEntityTypeConfiguration<Public
     {
         b.Property(x => x.Status).HasConversion<string>();
         b.HasIndex(x => new { x.ChannelId, x.Status });
+        // Last line of defence against duplicate posts: one active publication per story and channel.
+        b.HasIndex(x => new { x.StoryId, x.ChannelId }).IsUnique()
+            .HasFilter("\"Status\" IN ('Scheduled', 'Sending', 'Published')")
+            .HasDatabaseName("IX_Publications_StoryId_ChannelId_Active");
     }
 }
 

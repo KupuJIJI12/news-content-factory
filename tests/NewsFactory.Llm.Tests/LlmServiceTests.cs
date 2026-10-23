@@ -41,7 +41,7 @@ public class LlmServiceTests(PostgresFixture db)
     }
 
     private LlmService Service(NewsFactoryDbContext ctx, ScriptedChatClient client) =>
-        new(ctx, client, new LlmBudgetGuard(ctx, _time, Samara));
+        new(ctx, db.CreateFactory(_time), client, new LlmBudgetGuard(ctx, _time, Samara));
 
     private static readonly Dictionary<string, string> Vars = new() { ["city"] = "Отрадный", ["sources"] = "текст" };
 
@@ -105,6 +105,34 @@ public class LlmServiceTests(PostgresFixture db)
             s => s.Score == 3 ? ["три нельзя"] : []);
         Assert.Equal(4, r.Score);
         Assert.Contains("три нельзя", client.Requests[1].Messages[^1].Content);
+    }
+
+    [Fact]
+    public async Task Calls_are_logged_even_when_callers_transaction_rolls_back()
+    {
+        await SeedAsync();
+        var client = new ScriptedChatClient("""{"score":11,"reason":"x"}""");
+        await using (var ctx = db.CreateContext(_time))
+        {
+            await using var tx = await ctx.Database.BeginTransactionAsync();
+            await Assert.ThrowsAsync<LlmResponseInvalidException>(() =>
+                Service(ctx, client).CompleteAsync<ScoringResult>(LlmTask.Scoring, Vars, new LlmCallContext()));
+            await tx.RollbackAsync();
+        }
+        await using var read = db.CreateContext();
+        Assert.Equal(2, await read.LlmCalls.CountAsync());
+    }
+
+    [Fact]
+    public async Task Does_not_flush_callers_pending_changes()
+    {
+        await SeedAsync();
+        var client = new ScriptedChatClient("""{"score":7,"reason":"ok"}""");
+        await using var ctx = db.CreateContext(_time);
+        ctx.Add(new AppSetting { Key = "pending", Value = "x" });
+        await Service(ctx, client).CompleteAsync<ScoringResult>(LlmTask.Scoring, Vars, new LlmCallContext());
+        await using var read = db.CreateContext();
+        Assert.False(await read.AppSettings.AnyAsync(a => a.Key == "pending"));
     }
 
     [Fact]

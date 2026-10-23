@@ -12,6 +12,8 @@ public sealed class PublicationService(NewsFactoryDbContext db, IPipelineQueue q
     public async Task<IReadOnlyList<long>> ScheduleAsync(long storyId, long userId, DateTimeOffset? at, long? storyImageId,
         bool overrideLimit, CancellationToken ct)
     {
+        await using var tx = await db.Database.BeginTransactionAsync(ct);
+        await LockStoryAsync(storyId, ct);
         var story = await db.Stories.Include(s => s.City).Include(s => s.Drafts).SingleAsync(s => s.Id == storyId, ct);
         story.TransitionTo(StoryStatus.Scheduled);
         var draft = story.Drafts.SingleOrDefault(d => d.IsCurrent)
@@ -37,13 +39,20 @@ public sealed class PublicationService(NewsFactoryDbContext db, IPipelineQueue q
 
         db.Publications.AddRange(created);
         await db.SaveChangesAsync(ct);
+        await tx.CommitAsync(ct);
         foreach (var p in created) p.HangfireJobId = queue.SchedulePublication(p.Id, publishAt);
         await db.SaveChangesAsync(ct);
         return created.Select(p => p.Id).ToList();
     }
 
+    /// <summary>Serializes schedule/cancel for one story so a double submit cannot create two publications.</summary>
+    private Task LockStoryAsync(long storyId, CancellationToken ct) =>
+        db.Database.ExecuteSqlAsync($"SELECT 1 FROM \"Stories\" WHERE \"Id\" = {storyId} FOR UPDATE", ct);
+
     public async Task CancelAsync(long storyId, CancellationToken ct)
     {
+        await using var tx = await db.Database.BeginTransactionAsync(ct);
+        await LockStoryAsync(storyId, ct);
         var story = await db.Stories.SingleAsync(s => s.Id == storyId, ct);
         var pending = await db.Publications
             .Where(p => p.StoryId == storyId && p.Status == PublicationStatus.Scheduled).ToListAsync(ct);
@@ -54,5 +63,6 @@ public sealed class PublicationService(NewsFactoryDbContext db, IPipelineQueue q
         }
         story.TransitionTo(StoryStatus.ReadyForReview);
         await db.SaveChangesAsync(ct);
+        await tx.CommitAsync(ct);
     }
 }

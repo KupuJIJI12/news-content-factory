@@ -52,7 +52,7 @@ public sealed class ProcessRawItemJob(NewsFactoryDbContext db, RelevanceStage re
         {
             queue.DelayRawItem(rawItemId, ex.ResumeAt);
         }
-        catch (LlmResponseInvalidException ex)
+        catch (Exception ex) when (ex is not LlmBudgetExceededException && !ct.IsCancellationRequested)
         {
             db.ChangeTracker.Clear();
             var fresh = await db.RawItems.SingleAsync(r => r.Id == rawItemId, ct);

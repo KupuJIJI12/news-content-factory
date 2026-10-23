@@ -27,6 +27,33 @@ public class PublicationServiceTests(PostgresFixture db) : PublicationTestBase(d
     }
 
     [Fact]
+    public async Task Concurrent_double_submit_creates_one_publication()
+    {
+        var (storyId, _) = await SeedStoryAsync();
+        var results = await Task.WhenAll(Enumerable.Range(0, 2).Select(async _ =>
+        {
+            try { await ScheduleAsync(storyId); return true; }
+            catch (InvalidStatusTransitionException) { return false; }
+        }));
+        await using var ctx = Db.CreateContext();
+        Assert.Equal(1, results.Count(r => r));
+        Assert.Equal(1, await ctx.Publications.CountAsync());
+        Assert.Single(Queue.Scheduled);
+    }
+
+    [Fact]
+    public async Task Database_rejects_second_active_publication_for_same_story_and_channel()
+    {
+        var (storyId, channelId) = await SeedStoryAsync();
+        await using var ctx = Db.CreateContext();
+        var draftId = (await ctx.Drafts.FirstAsync(d => d.StoryId == storyId)).Id;
+        ctx.AddRange(
+            new NewsFactory.Domain.Entities.Publication { StoryId = storyId, DraftId = draftId, ChannelId = channelId, ScheduledAt = Now },
+            new NewsFactory.Domain.Entities.Publication { StoryId = storyId, DraftId = draftId, ChannelId = channelId, ScheduledAt = Now });
+        await Assert.ThrowsAsync<DbUpdateException>(() => ctx.SaveChangesAsync());
+    }
+
+    [Fact]
     public async Task Schedule_for_later_uses_given_time()
     {
         var (storyId, _) = await SeedStoryAsync();

@@ -36,7 +36,8 @@ services.AddSingleton(TimeProvider.System);
 services.Configure<AppOptions>(config.GetSection("App"));
 services.AddSingleton(sp => TimeZoneInfo.FindSystemTimeZoneById(
     config.GetSection("App").Get<AppOptions>()?.TimeZone ?? new AppOptions().TimeZone));
-services.AddDbContext<NewsFactoryDbContext>(o => o.UseNpgsql(connectionString));
+services.AddDbContext<NewsFactoryDbContext>(o => o.UseNpgsql(connectionString), optionsLifetime: ServiceLifetime.Singleton);
+services.AddSingleton<IDbContextFactory<NewsFactoryDbContext>, NewsFactoryDbContextFactory>();
 
 // Hangfire
 services.AddHangfire(h => h

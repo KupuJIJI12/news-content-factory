@@ -17,7 +17,7 @@ public sealed class CollectSourceJob(
 {
     public static readonly TimeSpan MaxAge = TimeSpan.FromHours(48);
 
-    [DisableConcurrentExecution(600)]
+    [DisableConcurrentExecution("collect-source:{0}", 600)]
     public async Task RunAsync(long sourceId, CancellationToken ct)
     {
         var source = await db.Sources.SingleAsync(s => s.Id == sourceId, ct);

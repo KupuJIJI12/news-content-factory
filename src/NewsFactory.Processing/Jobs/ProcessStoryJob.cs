@@ -1,3 +1,4 @@
+using Hangfire;
 using Microsoft.EntityFrameworkCore;
 using NewsFactory.Domain;
 using NewsFactory.Domain.Abstractions;
@@ -13,6 +14,7 @@ public sealed class ProcessStoryJob(NewsFactoryDbContext db, ILlmService llm, IP
     private static readonly StoryStatus[] Frozen =
         [StoryStatus.Rejected, StoryStatus.Scheduled, StoryStatus.Published, StoryStatus.PublishFailed];
 
+    [DisableConcurrentExecution("process-story:{0}", 600)]
     public async Task RunAsync(long storyId, bool forceDraft, string? hint, CancellationToken ct)
     {
         var story = await Load(storyId, ct);
@@ -30,7 +32,7 @@ public sealed class ProcessStoryJob(NewsFactoryDbContext db, ILlmService llm, IP
         {
             db.ChangeTracker.Clear();
             var fresh = await db.Stories.SingleAsync(s => s.Id == storyId, ct);
-            fresh.Status = previous;
+            if (fresh.Status == StoryStatus.Processing) fresh.Status = previous;
             await db.SaveChangesAsync(ct);
             queue.DelayStory(storyId, ex.ResumeAt);
         }
@@ -38,6 +40,7 @@ public sealed class ProcessStoryJob(NewsFactoryDbContext db, ILlmService llm, IP
         {
             db.ChangeTracker.Clear();
             var fresh = await db.Stories.SingleAsync(s => s.Id == storyId, ct);
+            if (fresh.Status != StoryStatus.Processing) return; // another run already moved the story on
             fresh.TransitionTo(StoryStatus.ProcessingFailed);
             fresh.LastError = ex.Message;
             await db.SaveChangesAsync(ct);

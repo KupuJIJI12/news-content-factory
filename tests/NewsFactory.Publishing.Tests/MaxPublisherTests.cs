@@ -85,6 +85,15 @@ public class MaxPublisherTests
         await Assert.ThrowsAsync<PublisherTransientException>(() => Publisher().PublishAsync(Channel("-100"), Post(), default));
     }
 
+    [Theory]
+    [InlineData(HttpStatusCode.BadGateway)]
+    [InlineData(HttpStatusCode.GatewayTimeout)]
+    public async Task Gateway_errors_on_send_are_ambiguous(HttpStatusCode code)
+    {
+        _handler.Map(Messages, code, "{}");
+        await Assert.ThrowsAsync<PublisherAmbiguousException>(() => Publisher().PublishAsync(Channel("-100"), Post(), default));
+    }
+
     [Fact]
     public async Task Too_many_requests_is_transient()
     {

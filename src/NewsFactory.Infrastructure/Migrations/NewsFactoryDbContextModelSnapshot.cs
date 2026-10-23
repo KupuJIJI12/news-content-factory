@@ -437,11 +437,14 @@ namespace NewsFactory.Infrastructure.Migrations
 
                     b.HasIndex("DraftId");
 
-                    b.HasIndex("StoryId");
-
                     b.HasIndex("StoryImageId");
 
                     b.HasIndex("ChannelId", "Status");
+
+                    b.HasIndex("StoryId", "ChannelId")
+                        .IsUnique()
+                        .HasDatabaseName("IX_Publications_StoryId_ChannelId_Active")
+                        .HasFilter("\"Status\" IN ('Scheduled', 'Sending', 'Published')");
 
                     b.ToTable("Publications");
                 });

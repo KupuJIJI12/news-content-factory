@@ -82,3 +82,13 @@ public sealed class PostgresFixture : IAsyncLifetime
         await create.ExecuteNonQueryAsync();
     }
 }
+
+public static class PostgresFixtureExtensions
+{
+    public static Microsoft.EntityFrameworkCore.IDbContextFactory<NewsFactory.Infrastructure.NewsFactoryDbContext> CreateFactory(
+        this PostgresFixture db, TimeProvider? time = null) =>
+        new NewsFactory.Infrastructure.NewsFactoryDbContextFactory(
+            new Microsoft.EntityFrameworkCore.DbContextOptionsBuilder<NewsFactory.Infrastructure.NewsFactoryDbContext>()
+                .UseNpgsql(db.ConnectionString).Options,
+            time ?? TimeProvider.System);
+}

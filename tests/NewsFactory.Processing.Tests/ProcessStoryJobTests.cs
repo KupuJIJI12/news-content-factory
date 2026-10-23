@@ -131,6 +131,24 @@ public class ProcessStoryJobTests(PostgresFixture db)
     }
 
     [Fact]
+    public async Task Failure_after_another_run_finished_does_not_throw_or_override_status()
+    {
+        var id = await SeedAsync();
+        Score(8);
+        _llm.Respond<RewriteResult>(LlmTask.Rewrite, _ =>
+        {
+            using var other = db.CreateContext();
+            var s = other.Stories.Single(x => x.Id == id);
+            s.Status = StoryStatus.ReadyForReview; // a parallel run already finished
+            other.SaveChanges();
+            throw new HttpRequestException("LLM недоступна");
+        });
+        await RunAsync(id);
+        await using var ctx = db.CreateContext();
+        Assert.Equal(StoryStatus.ReadyForReview, (await ctx.Stories.SingleAsync()).Status);
+    }
+
+    [Fact]
     public async Task Published_story_is_not_touched()
     {
         var id = await SeedAsync(StoryStatus.Published);

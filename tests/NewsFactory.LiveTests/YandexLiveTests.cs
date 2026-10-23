@@ -26,7 +26,7 @@ public class YandexLiveTests
         await SeedData.ApplyAsync(ctx, config, default);
 
         var samara = TimeZoneInfo.FindSystemTimeZoneById("Europe/Samara");
-        var llm = new LlmService(ctx, new LlmClientFactory(new SimpleFactory(), config, TimeProvider.System),
+        var llm = new LlmService(ctx, db.CreateFactory(), new LlmClientFactory(new SimpleFactory(), config, TimeProvider.System),
             new LlmBudgetGuard(ctx, TimeProvider.System, samara));
         var sources = "### Источник 1: otradny.org\nВ Отрадном поздравили работников транспорта\n" + await File.ReadAllTextAsync("Fixtures/story.txt");
 

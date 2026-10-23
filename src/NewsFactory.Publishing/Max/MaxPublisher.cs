@@ -59,6 +59,9 @@ public sealed class MaxPublisher(HttpClient http, IOptions<MaxOptions> options) 
                 }
 
                 var message = $"Max ответил {(int)response.StatusCode}: {Describe(payload)}";
+                // A gateway error can be returned after Max already accepted the message: never auto-resend.
+                if (response.StatusCode is HttpStatusCode.BadGateway or HttpStatusCode.GatewayTimeout)
+                    throw new PublisherAmbiguousException(message);
                 throw IsTransient(response.StatusCode) ? new PublisherTransientException(message) : new PublisherPermanentException(message);
             }
         }

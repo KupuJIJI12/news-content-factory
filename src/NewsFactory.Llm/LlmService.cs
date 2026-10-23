@@ -9,7 +9,7 @@ using NewsFactory.Llm.Clients;
 
 namespace NewsFactory.Llm;
 
-public sealed class LlmService(NewsFactoryDbContext db, ILlmClientResolver clients, LlmBudgetGuard budget) : ILlmService
+public sealed class LlmService(NewsFactoryDbContext db, IDbContextFactory<NewsFactoryDbContext> logs, ILlmClientResolver clients, LlmBudgetGuard budget) : ILlmService
 {
     private const int MaxAttempts = 2;
     private static readonly JsonSerializerOptions Json = JsonSerializerOptions.Web;
@@ -42,7 +42,6 @@ public sealed class LlmService(NewsFactoryDbContext db, ILlmClientResolver clien
                 StoryId = ctx.StoryId, RawItemId = ctx.RawItemId,
                 Request = JsonSerializer.Serialize(messages, Json),
             };
-            db.LlmCalls.Add(call);
             var sw = Stopwatch.StartNew();
             ChatCompletion completion;
             try
@@ -53,7 +52,7 @@ public sealed class LlmService(NewsFactoryDbContext db, ILlmClientResolver clien
             {
                 call.LatencyMs = sw.ElapsedMilliseconds;
                 call.Error = ex.Message;
-                await db.SaveChangesAsync(CancellationToken.None);
+                await LogAsync(call);
                 throw;
             }
 
@@ -64,7 +63,7 @@ public sealed class LlmService(NewsFactoryDbContext db, ILlmClientResolver clien
             var parsed = LlmJson.Parse(completion.Content, validate);
             call.Success = parsed.Ok;
             call.Error = parsed.Ok ? null : string.Join("; ", parsed.Errors);
-            await db.SaveChangesAsync(ct);
+            await LogAsync(call);
             if (parsed.Ok) return parsed.Value!;
 
             errors = parsed.Errors;
@@ -74,5 +73,16 @@ public sealed class LlmService(NewsFactoryDbContext db, ILlmClientResolver clien
         }
 
         throw new LlmResponseInvalidException(task, errors);
+    }
+
+    /// <summary>
+    /// Writes the call log through its own context: it must survive the caller's transaction rolling back
+    /// (spec §8, budget accounting) and must not flush the caller's pending changes.
+    /// </summary>
+    private async Task LogAsync(LlmCall call)
+    {
+        await using var logDb = await logs.CreateDbContextAsync(CancellationToken.None);
+        logDb.LlmCalls.Add(call);
+        await logDb.SaveChangesAsync(CancellationToken.None);
     }
 }
