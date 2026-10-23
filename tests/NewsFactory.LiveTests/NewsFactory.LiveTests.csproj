@@ -10,4 +10,7 @@
     <ProjectReference Include="..\..\src\NewsFactory.Api\NewsFactory.Api.csproj" />
     <ProjectReference Include="..\NewsFactory.TestSupport\NewsFactory.TestSupport.csproj" />
   </ItemGroup>
+  <ItemGroup>
+    <None Include="Fixtures\**" CopyToOutputDirectory="PreserveNewest" />
+  </ItemGroup>
 </Project>
