@@ -1,0 +1,10 @@
+<Project Sdk="Microsoft.NET.Sdk.Web">
+  <ItemGroup>
+    <ProjectReference Include="..\..\src\NewsFactory.Domain\NewsFactory.Domain.csproj" />
+    <ProjectReference Include="..\..\src\NewsFactory.Infrastructure\NewsFactory.Infrastructure.csproj" />
+    <ProjectReference Include="..\..\src\NewsFactory.Collection\NewsFactory.Collection.csproj" />
+    <ProjectReference Include="..\..\src\NewsFactory.Llm\NewsFactory.Llm.csproj" />
+    <ProjectReference Include="..\..\src\NewsFactory.Processing\NewsFactory.Processing.csproj" />
+    <ProjectReference Include="..\..\src\NewsFactory.Publishing\NewsFactory.Publishing.csproj" />
+  </ItemGroup>
+</Project>

@@ -1,0 +1,6 @@
+<Project Sdk="Microsoft.NET.Sdk">
+  <ItemGroup>
+    <ProjectReference Include="..\..\src\NewsFactory.Domain\NewsFactory.Domain.csproj" />
+    <ProjectReference Include="..\..\src\NewsFactory.Infrastructure\NewsFactory.Infrastructure.csproj" />
+  </ItemGroup>
+</Project>
