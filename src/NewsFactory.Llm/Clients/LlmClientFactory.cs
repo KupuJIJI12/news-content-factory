@@ -5,10 +5,12 @@ using NewsFactory.Domain.Entities;
 
 namespace NewsFactory.Llm.Clients;
 
-public sealed class LlmClientFactory(IHttpClientFactory http, IConfiguration config, TimeProvider time)
+public sealed class LlmClientFactory(IHttpClientFactory http, IConfiguration config, TimeProvider time) : ILlmClientResolver
 {
     public const string HttpClientName = "llm";
     private readonly ConcurrentDictionary<long, GigaChatTokenProvider> _tokens = new();
+
+    public IChatCompletionClient Resolve(LlmProvider provider) => Create(provider);
 
     public IChatCompletionClient Create(LlmProvider provider)
     {
