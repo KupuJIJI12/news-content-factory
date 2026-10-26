@@ -3,6 +3,7 @@ using System.Threading.RateLimiting;
 using Hangfire;
 using Microsoft.AspNetCore.Authentication.Cookies;
 using NewsFactory.Api.Admin.Auth;
+using NewsFactory.Api.Admin.Counters;
 
 namespace NewsFactory.Api.Admin;
 
@@ -34,6 +35,10 @@ public static class AdminSetup
                 http.Connection.RemoteIpAddress?.ToString() ?? "unknown",
                 _ => new FixedWindowRateLimiterOptions { PermitLimit = 5, Window = TimeSpan.FromMinutes(1), QueueLimit = 0 }));
         });
+        services.AddSignalR();
+        services.Configure<CountersOptions>(config.GetSection("Admin"));
+        services.AddScoped<CountersService>();
+        services.AddHostedService<CountersBroadcaster>();
         return services;
     }
 
@@ -46,6 +51,8 @@ public static class AdminSetup
 
         var api = app.MapGroup("/api").RequireAuthorization();
         app.MapAuthEndpoints(api);
+        api.MapGet("/counters", (CountersService counters, CancellationToken ct) => counters.GetAsync(ct));
+        app.MapHub<AdminHub>(AdminHub.Path).RequireAuthorization();
         return app;
     }
 }
