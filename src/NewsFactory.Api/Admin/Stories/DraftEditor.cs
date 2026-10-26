@@ -8,7 +8,7 @@ namespace NewsFactory.Api.Admin.Stories;
 
 public sealed class DraftEditor(NewsFactoryDbContext db)
 {
-    public static readonly StoryStatus[] Editable = [StoryStatus.ReadyForReview, StoryStatus.LowInterest, StoryStatus.PublishFailed];
+    public static readonly StoryStatus[] Editable = [StoryStatus.ReadyForReview, StoryStatus.PublishFailed];
 
     /// <summary>Saves the moderator's text as a new current version and re-checks facts against the sources.</summary>
     public async Task<DraftDto?> SaveAsync(long storyId, long userId, string title, string body, IReadOnlyList<string> hashtags,

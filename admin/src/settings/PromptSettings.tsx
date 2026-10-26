@@ -34,7 +34,7 @@ export function PromptSettings() {
     setTextError(null)
     try {
       await createPrompt(current.task, text)
-      notifications.show({ color: 'green', message: 'Сохранено как новая версия (пока не активна)' })
+      notifications.show({ color: 'green', message: 'Новая версия сохранена и уже используется' })
       setDrafts((d) => ({ ...d, [current.task]: undefined }))
       await queryClient.invalidateQueries({ queryKey: promptsKey })
     } catch (err) {

@@ -36,4 +36,11 @@ describe('useDraftAutosave', () => {
     act(() => { vi.advanceTimersByTime(600) })
     expect(result.current.restore()).toBeNull()
   })
+
+  it('keeps text typed right before an unmount or redirect', () => {
+    const first = renderHook(() => useDraftAutosave(8, value, true))
+    first.unmount() // no time passes: a 401 redirect or navigation right after a keystroke
+    const second = renderHook(() => useDraftAutosave(8, null, false))
+    expect(second.result.current.restore()).toEqual(value)
+  })
 })

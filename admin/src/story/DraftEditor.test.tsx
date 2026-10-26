@@ -27,4 +27,13 @@ describe('DraftEditor', () => {
     await userEvent.click(await screen.findByRole('button', { name: 'Перегенерировать всё равно' }))
     await waitFor(() => expect(stories.regenerate).toHaveBeenCalledWith(5, 'короче'))
   })
+
+  it('confirmed regenerate discards unsaved edits', async () => {
+    vi.mocked(stories.regenerate).mockImplementation(async () => undefined)
+    const onDiscard = vi.fn()
+    renderWithProviders(<DraftEditor story={story()} value={value} onChange={() => {}} dirty onSaved={() => {}} onDiscard={onDiscard} />)
+    await userEvent.click(screen.getByRole('button', { name: 'Перегенерировать' }))
+    await userEvent.click(await screen.findByRole('button', { name: 'Перегенерировать всё равно' }))
+    await waitFor(() => expect(onDiscard).toHaveBeenCalled())
+  })
 })

@@ -166,6 +166,24 @@ public class ProcessStoryJobTests(PostgresFixture db)
     }
 
     [Fact]
+    public async Task Retry_of_failed_story_with_human_draft_returns_it_to_review()
+    {
+        var id = await SeedAsync(StoryStatus.ProcessingFailed, s =>
+        {
+            s.LastError = "LLM вернул некорректный JSON";
+            s.Drafts.Add(new Draft { Version = 2, Title = "Правка модератора", Body = "b", IsCurrent = true, AuthorUserId = 1 });
+        });
+        Score(8);
+        Rewrite();
+        await RunAsync(id);
+        await using var ctx = db.CreateContext();
+        var story = await ctx.Stories.Include(s => s.Drafts).SingleAsync();
+        Assert.DoesNotContain(_llm.Calls, c => c.Task == LlmTask.Rewrite);
+        Assert.Equal("Правка модератора", story.Drafts.Single(d => d.IsCurrent).Title);
+        Assert.Equal((StoryStatus.ReadyForReview, (string?)null), (story.Status, story.LastError));
+    }
+
+    [Fact]
     public async Task Published_story_is_not_touched()
     {
         var id = await SeedAsync(StoryStatus.Published);

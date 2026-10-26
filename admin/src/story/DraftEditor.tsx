@@ -4,7 +4,7 @@ import { regenerate, saveDraft } from '../api/stories'
 import type { DraftDto, DraftInput, StoryDetail } from '../api/types'
 import { notifyError, notifyOk, useStoryRefresh } from './useStoryActions'
 
-const EDITABLE = ['ReadyForReview', 'LowInterest', 'PublishFailed']
+const EDITABLE = ['ReadyForReview', 'PublishFailed']
 const REGENERATABLE = ['ReadyForReview', 'LowInterest', 'ProcessingFailed']
 
 type Props = {
@@ -13,9 +13,11 @@ type Props = {
   onChange: (value: DraftInput) => void
   dirty: boolean
   onSaved: (draft: DraftDto) => void
+  /** Called when the moderator confirmed a regeneration that drops their unsaved edits. */
+  onDiscard?: () => void
 }
 
-export function DraftEditor({ story, value, onChange, dirty, onSaved }: Props) {
+export function DraftEditor({ story, value, onChange, dirty, onSaved, onDiscard }: Props) {
   const [hint, setHint] = useState('')
   const [confirm, setConfirm] = useState(false)
   const [busy, setBusy] = useState(false)
@@ -46,6 +48,7 @@ export function DraftEditor({ story, value, onChange, dirty, onSaved }: Props) {
     setBusy(true)
     try {
       await regenerate(story.id, hint.trim() || null)
+      if (dirty) onDiscard?.()
       notifyOk('Новая версия готовится, страница обновится сама')
       setHint('')
       await refresh()

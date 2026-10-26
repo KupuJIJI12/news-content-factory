@@ -70,10 +70,12 @@ public class StoryActionsTests(PostgresFixture db)
         Assert.Equal("validation", await AdminTestHost.ProblemCodeAsync(resp));
     }
 
-    [Fact]
-    public async Task Cannot_edit_scheduled_story()
+    [Theory]
+    [InlineData(StoryStatus.Scheduled)]
+    [InlineData(StoryStatus.LowInterest)] // cannot be published from there, so an edit would be a dead end
+    public async Task Cannot_edit_story_that_is_not_publishable(StoryStatus status)
     {
-        var (host, id) = await StartWithStoryAsync(StoryStatus.Scheduled);
+        var (host, id) = await StartWithStoryAsync(status);
         await using var _ = host;
         var resp = await host.PutJsonAsync($"/api/stories/{id}/draft", new { title = "t", body = "b", hashtags = Array.Empty<string>() });
         Assert.Equal(HttpStatusCode.Conflict, resp.StatusCode);

@@ -42,7 +42,8 @@ export async function apiFetch<T>(path: string, init: ApiInit = {}): Promise<T> 
     if (response.status === 401 && path !== '/api/auth/login') onUnauthorized?.()
     const { title, code, type: _type, status: _status, detail, traceId: _traceId, ...extra } =
       (payload ?? {}) as Record<string, unknown>
-    const message = (title as string) || (detail as string) || `Ошибка ${response.status}`
+    const message = (title as string) || (detail as string) ||
+      (response.status === 413 ? 'Файл слишком большой' : `Ошибка ${response.status}`)
     throw new ApiError(response.status, message, code as string | undefined, extra)
   }
   return payload as T

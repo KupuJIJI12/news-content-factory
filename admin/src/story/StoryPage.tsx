@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useRef, useState } from 'react'
+import { useEffect, useMemo, useState } from 'react'
 import { useParams, Link } from 'react-router'
 import { useQuery } from '@tanstack/react-query'
 import { useDebouncedValue, useMediaQuery } from '@mantine/hooks'
@@ -42,26 +42,34 @@ export function StoryPage() {
   const [value, setValue] = useState<DraftInput>(toInput(null))
   const [selectedImageId, setSelectedImageId] = useState<number | null>(null)
   const [restorable, setRestorable] = useState<DraftInput | null>(null)
-  const loadedDraftId = useRef<number | null | undefined>(undefined)
+  const [loadedDraftId, setLoadedDraftId] = useState<number | null | undefined>(undefined)
+  const [keptOver, setKeptOver] = useState<number | null>(null)
   const dirty = !same(value, baseline)
   const autosave = useDraftAutosave(id, value, dirty)
 
-  // Take a new server draft only when it changed and the moderator has no unsaved edits.
-  useEffect(() => {
-    if (!story) return
-    const draftId = story.currentDraft?.id ?? null
-    if (loadedDraftId.current === draftId) return
-    const first = loadedDraftId.current === undefined
-    if (!first && dirty) return
-    loadedDraftId.current = draftId
-    const next = toInput(story.currentDraft)
+  const adopt = (d: DraftDto | null) => {
+    const next = toInput(d)
+    setLoadedDraftId(d?.id ?? null)
     setBaseline(next)
     setValue(next)
-    if (first) {
+  }
+
+  // Take a new server draft only when the moderator has no unsaved edits; otherwise offer it in a banner.
+  const serverDraft = story?.currentDraft ?? null
+  const serverDraftId = serverDraft?.id ?? null
+  useEffect(() => {
+    if (!story || loadedDraftId === serverDraftId) return
+    if (loadedDraftId === undefined) {
+      adopt(serverDraft)
       const saved = autosave.restore()
-      if (saved && !same(saved, next)) setRestorable(saved)
+      if (saved && !same(saved, toInput(serverDraft))) setRestorable(saved)
+      return
     }
-  }, [story, dirty, autosave])
+    if (!dirty) adopt(serverDraft)
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [story, serverDraftId, loadedDraftId, dirty])
+  const newerVersion = story && loadedDraftId !== undefined && serverDraftId !== loadedDraftId && dirty && keptOver !== serverDraftId
+    ? serverDraft : null
 
   const selectedImage = story?.images.find((i) => i.id === selectedImageId) ?? null
   const [debounced] = useDebouncedValue(value, 400)
@@ -78,18 +86,20 @@ export function StoryPage() {
   if (error || !story) return <Alert color="red">Сюжет не найден. <Anchor component={Link} to="/">К очереди</Anchor></Alert>
 
   const onSaved = (d: DraftDto) => {
-    const next = toInput(d)
-    loadedDraftId.current = d.id
-    setBaseline(next)
-    setValue(next)
+    adopt(d)
+    autosave.clear()
+  }
+  const onDiscard = () => {
+    setValue(baseline)
     autosave.clear()
   }
 
+  const canEditNow = story.status === 'ReadyForReview' || story.status === 'PublishFailed'
   const sourcesCol = <SourcesColumn sources={story.sources} tz={tz} />
   const editorCol = (
     <Stack gap="sm">
       {story.currentDraft
-        ? <DraftEditor story={story} value={value} onChange={setValue} dirty={dirty} onSaved={onSaved} />
+        ? <DraftEditor story={story} value={value} onChange={setValue} dirty={dirty} onSaved={onSaved} onDiscard={onDiscard} />
         : <Text c="dimmed">{story.status === 'Processing' || story.status === 'New' ? 'Черновик готовится…' : 'Черновика нет.'}</Text>}
     </Stack>
   )
@@ -123,7 +133,18 @@ export function StoryPage() {
         </Alert>
       )}
       {story.lastError && <Alert color="red" p="xs" title="Последняя ошибка">{story.lastError}</Alert>}
-      {restorable && (
+      {newerVersion && (
+        <Alert color="blue" p="xs">
+          <Group justify="space-between" wrap="nowrap">
+            <Text size="sm">{`Появилась версия ${newerVersion.version}. Ваши несохранённые правки сделаны поверх предыдущей.`}</Text>
+            <Group gap="xs" wrap="nowrap">
+              <Button size="xs" onClick={() => { adopt(newerVersion); autosave.clear() }}>Показать новую</Button>
+              <Button size="xs" variant="default" onClick={() => setKeptOver(newerVersion.id)}>Оставить мои правки</Button>
+            </Group>
+          </Group>
+        </Alert>
+      )}
+      {restorable && canEditNow && (
         <Alert color="yellow" p="xs">
           <Group justify="space-between" wrap="nowrap">
             <Text size="sm">Есть несохранённые правки с прошлого раза.</Text>

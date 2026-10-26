@@ -67,7 +67,10 @@ public sealed class ProcessStoryJob(NewsFactoryDbContext db, ILlmService llm, IP
         if (!forceDraft && hint is null && humanDraft)
         {
             story.HasUpdates = true;
-            story.Status = previous == StoryStatus.Processing ? StoryStatus.ReadyForReview : previous;
+            // A retry of a failed run lands back in review: the moderator's text is intact, the failure is over.
+            story.Status = previous is StoryStatus.Processing or StoryStatus.ProcessingFailed or StoryStatus.New
+                ? StoryStatus.ReadyForReview : previous;
+            story.LastError = null;
             await db.SaveChangesAsync(ct);
             return;
         }

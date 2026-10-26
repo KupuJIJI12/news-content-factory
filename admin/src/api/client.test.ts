@@ -25,6 +25,11 @@ describe('apiFetch', () => {
     })
   })
 
+  it('maps an empty 413 from the server to a readable message', async () => {
+    mockFetch(413, undefined, 'text/plain')
+    await expect(apiFetch('/api/stories/1/images', { method: 'POST' })).rejects.toMatchObject({ status: 413, message: 'Файл слишком большой' })
+  })
+
   it('calls onUnauthorized on 401', async () => {
     mockFetch(401, { code: 'x' }, 'application/problem+json')
     const spy = vi.fn()

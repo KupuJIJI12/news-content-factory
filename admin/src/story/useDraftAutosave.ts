@@ -3,14 +3,12 @@ import type { DraftInput } from '../api/types'
 
 const key = (storyId: number) => `draft:${storyId}`
 
-/** Keeps unsaved editor fields in sessionStorage (debounced) so an expired session or reload does not lose them. */
+/** Keeps unsaved editor fields in sessionStorage so an expired session or reload does not lose them. */
 export function useDraftAutosave(storyId: number, value: DraftInput | null, dirty: boolean) {
+  // Written on every change, not debounced: a 401 redirect or navigation can follow a keystroke immediately.
   useEffect(() => {
     if (!dirty || !value) return
-    const t = setTimeout(() => {
-      try { sessionStorage.setItem(key(storyId), JSON.stringify(value)) } catch { /* storage unavailable */ }
-    }, 500)
-    return () => clearTimeout(t)
+    try { sessionStorage.setItem(key(storyId), JSON.stringify(value)) } catch { /* storage unavailable */ }
   }, [storyId, value, dirty])
 
   const restore = useCallback((): DraftInput | null => {

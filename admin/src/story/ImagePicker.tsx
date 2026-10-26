@@ -8,9 +8,12 @@ import { notifyError, notifyOk, useStoryRefresh } from './useStoryActions'
 
 type Props = { story: StoryDetail; selectedImageId: number | null; onSelect: (id: number | null) => void }
 
+export const MAX_UPLOAD_BYTES = 15 * 1024 * 1024
+
 export function ImagePicker({ story, selectedImageId, onSelect }: Props) {
   const [credit, setCredit] = useState('')
   const [busy, setBusy] = useState(false)
+  const [uploadError, setUploadError] = useState<string | null>(null)
   const [askPermission, setAskPermission] = useState<{ rawItemId: number; url: string } | null>(null)
   const refresh = useStoryRefresh(story.id)
   const attached = new Set(story.images.map((i) => i.url))
@@ -32,6 +35,11 @@ export function ImagePicker({ story, selectedImageId, onSelect }: Props) {
 
   async function upload(file: File | null) {
     if (!file) return
+    setUploadError(null)
+    if (file.size > MAX_UPLOAD_BYTES) {
+      setUploadError('Картинка больше 15 МБ')
+      return
+    }
     setBusy(true)
     try {
       const image = await uploadImage(story.id, file, credit.trim() || null)
@@ -105,6 +113,8 @@ export function ImagePicker({ story, selectedImageId, onSelect }: Props) {
           {(props) => <Button size="xs" variant="default" loading={busy} {...props}>Загрузить своё</Button>}
         </FileButton>
       </Group>
+
+      {uploadError && <Text size="xs" c="red">{uploadError}</Text>}
 
       <Modal opened={askPermission !== null} onClose={() => setAskPermission(null)} title="Нет разрешения" centered>
         <Stack>

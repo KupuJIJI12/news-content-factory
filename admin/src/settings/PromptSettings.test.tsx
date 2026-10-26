@@ -5,6 +5,7 @@ import { renderWithProviders } from '../test/render'
 import { ApiError } from '../api/client'
 import * as api from '../api/settings'
 import type { PromptTask } from '../api/types'
+import { notifications } from '@mantine/notifications'
 import { PromptSettings } from './PromptSettings'
 
 vi.mock('../api/settings', async (o) => ({ ...(await o<typeof api>()), getPrompts: vi.fn(), createPrompt: vi.fn(), activatePrompt: vi.fn() }))
@@ -42,5 +43,14 @@ describe('PromptSettings', () => {
     renderWithProviders(<PromptSettings />)
     await userEvent.click(await screen.findByRole('button', { name: 'Сделать активной' }))
     await waitFor(() => expect(api.activatePrompt).toHaveBeenCalledWith(1))
+  })
+
+  it('says the saved version is already active', async () => {
+    vi.mocked(api.createPrompt).mockImplementation(async () => ({ id: 3, version: 3, isActive: true, createdAt: '2026-10-26T10:00:00Z', text: 'x' }))
+    const show = vi.spyOn(notifications, 'show')
+    renderWithProviders(<PromptSettings />)
+    fireEvent.change(await screen.findByLabelText(/Новая версия/), { target: { value: 'Новый {{city}}' } })
+    await userEvent.click(screen.getByRole('button', { name: 'Сохранить как новую версию' }))
+    await waitFor(() => expect(show).toHaveBeenCalledWith(expect.objectContaining({ message: 'Новая версия сохранена и уже используется' })))
   })
 })
