@@ -8,6 +8,7 @@ using NewsFactory.Api.Admin.Stories;
 using NewsFactory.Api.Admin.Preview;
 using NewsFactory.Api.Admin.Images;
 using NewsFactory.Api.Admin.Sources;
+using NewsFactory.Api.Admin.Settings;
 
 namespace NewsFactory.Api.Admin;
 
@@ -65,6 +66,7 @@ public static class AdminSetup
         api.MapPreviewEndpoints();
         api.MapImageEndpoints();
         api.MapSourceEndpoints();
+        api.MapSettingsEndpoints();
         app.MapHub<AdminHub>(AdminHub.Path).RequireAuthorization();
         return app;
     }
