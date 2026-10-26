@@ -1,0 +1,9 @@
+{"response":{"count":5,"items":[
+  {"id":101,"owner_id":-12345,"date":1792735200,"text":"В Отрадном открыли новый каток. Подробности в сюжете ТРК.",
+   "attachments":[{"type":"photo","photo":{"sizes":[{"type":"s","url":"https://sun.userapi.com/small.jpg","width":100,"height":75},{"type":"z","url":"https://sun.userapi.com/big.jpg","width":1280,"height":960},{"type":"m","url":"https://sun.userapi.com/mid.jpg","width":640,"height":480}]}}]},
+  {"id":102,"owner_id":-12345,"date":1792735100,"marked_as_ads":1,"text":"Реклама: лучшие окна в городе!"},
+  {"id":103,"owner_id":-12345,"date":1792735000,"text":"",
+   "copy_history":[{"id":9,"owner_id":-777,"text":"Это текст оригинала про ремонт дороги. Работы продлятся неделю.","attachments":[{"type":"photo","photo":{"sizes":[{"type":"x","url":"https://sun.userapi.com/repost.jpg","width":800,"height":600}]}}]}]},
+  {"id":104,"owner_id":-12345,"date":1792734900,"text":"","attachments":[{"type":"photo","photo":{"sizes":[{"type":"x","url":"https://sun.userapi.com/only.jpg","width":800,"height":600}]}}]},
+  {"id":105,"owner_id":-12345,"date":1792734800,"text":"Очень длинное первое предложение о том, как в городе Отрадный жители собрались во дворе дома на улице Гагарина и вместе высадили аллею из сорока молодых лип и клёнов. Второе предложение."}
+]}}

@@ -1,0 +1,16 @@
+{
+  "otradny": {
+    "listUrl": "https://otradny.org/sitenews/",
+    "itemSelector": ".tabs_news",
+    "linkSelector": "p.url a",
+    "dateSelector": "p.date",
+    "imageSelector": ".incontent img"
+  },
+  "63ru": {
+    "listUrl": "https://63.ru/text/tags/otradnyy/",
+    "itemSelector": "[class*='announcementList'] > div",
+    "linkSelector": "a[data-announcement-title]",
+    "dateSelector": "[data-announcement-date]",
+    "dateFormat": "d MMMM, yyyy, HH:mm"
+  }
+}

@@ -1,0 +1,13 @@
+<Project Sdk="Microsoft.NET.Sdk">
+  <ItemGroup>
+    <PackageReference Include="AngleSharp" />
+    <PackageReference Include="Hangfire.Core" />
+    <PackageReference Include="SmartReader" />
+    <PackageReference Include="Microsoft.Extensions.Logging.Abstractions" />
+    <PackageReference Include="Microsoft.Extensions.Options" />
+  </ItemGroup>
+  <ItemGroup>
+    <ProjectReference Include="..\..\src\NewsFactory.Domain\NewsFactory.Domain.csproj" />
+    <ProjectReference Include="..\..\src\NewsFactory.Infrastructure\NewsFactory.Infrastructure.csproj" />
+  </ItemGroup>
+</Project>

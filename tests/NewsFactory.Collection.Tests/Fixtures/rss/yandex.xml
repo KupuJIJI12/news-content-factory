@@ -1,0 +1,22 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<rss version="2.0" xmlns:yandex="http://news.yandex.ru" xmlns:turbo="http://turbo.yandex.ru">
+  <channel>
+    <title>Лента с полным текстом Яндекса</title>
+    <link>https://feed.example/</link>
+    <item>
+      <title>Полный текст в yandex:full-text</title>
+      <link>https://feed.example/news/y1</link>
+      <pubDate>Fri, 23 Oct 2026 20:36:12 +0400</pubDate>
+      <description>Короткий анонс.</description>
+      <yandex:full-text>Первый абзац полного текста &amp;mdash; с тире.
+
+Второй абзац полного текста.</yandex:full-text>
+    </item>
+    <item>
+      <title>Полный текст в turbo:content</title>
+      <link>https://feed.example/news/y2</link>
+      <description>Короткий анонс.</description>
+      <turbo:content><![CDATA[<header><h1>Заголовок</h1></header><p>Текст из турбо-страницы.</p>]]></turbo:content>
+    </item>
+  </channel>
+</rss>
