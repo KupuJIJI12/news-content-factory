@@ -59,7 +59,7 @@ public sealed class AdminTestHost : IAsyncDisposable
             b.UseSetting("ADMIN_LOGIN", Login);
             b.UseSetting("ADMIN_PASSWORD", Password);
             b.UseSetting("MAX_CHANNEL_CHAT_ID", "-100");
-            b.UseSetting("Hangfire:WorkerCount", "1");
+            b.UseSetting("Hangfire:ServerEnabled", "false");
             b.UseSetting("Admin:CountersIntervalSeconds", "3600");
             foreach (var (k, v) in settings ?? new Dictionary<string, string>()) b.UseSetting(k, v);
             b.ConfigureServices(s =>

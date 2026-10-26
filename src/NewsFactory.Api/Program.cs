@@ -46,7 +46,8 @@ services.AddHangfire(h => h
     .UseSimpleAssemblyNameTypeSerializer()
     .UseRecommendedSerializerSettings()
     .UsePostgreSqlStorage(o => o.UseNpgsqlConnection(connectionString)));
-services.AddHangfireServer(o => o.WorkerCount = config.GetValue("Hangfire:WorkerCount", 4));
+if (config.GetValue("Hangfire:ServerEnabled", true))
+    services.AddHangfireServer(o => o.WorkerCount = config.GetValue("Hangfire:WorkerCount", 4));
 GlobalJobFilters.Filters.Add(new AutomaticRetryAttribute { Attempts = 2 });
 services.AddSingleton<IPipelineQueue, HangfirePipelineQueue>();
 services.AddSingleton<ICollectQueue, HangfireCollectQueue>();
