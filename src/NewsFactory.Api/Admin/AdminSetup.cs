@@ -4,6 +4,7 @@ using Hangfire;
 using Microsoft.AspNetCore.Authentication.Cookies;
 using NewsFactory.Api.Admin.Auth;
 using NewsFactory.Api.Admin.Counters;
+using NewsFactory.Api.Admin.Stories;
 
 namespace NewsFactory.Api.Admin;
 
@@ -38,6 +39,7 @@ public static class AdminSetup
         services.AddSignalR();
         services.Configure<CountersOptions>(config.GetSection("Admin"));
         services.AddScoped<CountersService>();
+        services.AddScoped<StoryQueries>();
         services.AddHostedService<CountersBroadcaster>();
         return services;
     }
@@ -52,6 +54,7 @@ public static class AdminSetup
         var api = app.MapGroup("/api").RequireAuthorization();
         app.MapAuthEndpoints(api);
         api.MapGet("/counters", (CountersService counters, CancellationToken ct) => counters.GetAsync(ct));
+        api.MapStoryEndpoints();
         app.MapHub<AdminHub>(AdminHub.Path).RequireAuthorization();
         return app;
     }
