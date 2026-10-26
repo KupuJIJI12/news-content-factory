@@ -2,6 +2,7 @@ import { Route, Routes } from 'react-router'
 import { LoginPage } from './auth/LoginPage'
 import { RequireAuth } from './auth/RequireAuth'
 import { AppShellLayout } from './layout/AppShellLayout'
+import { QueuePage } from './queue/QueuePage'
 
 function Placeholder({ title }: { title: string }) {
   return <div>{title}</div>
@@ -12,7 +13,7 @@ export function App() {
     <Routes>
       <Route path="/login" element={<LoginPage />} />
       <Route element={<RequireAuth><AppShellLayout /></RequireAuth>}>
-        <Route path="/" element={<Placeholder title="Очередь" />} />
+        <Route path="/" element={<QueuePage />} />
         <Route path="/stories/:id" element={<Placeholder title="Сюжет" />} />
         <Route path="/sources" element={<Placeholder title="Источники" />} />
         <Route path="/settings" element={<Placeholder title="Настройки" />} />
