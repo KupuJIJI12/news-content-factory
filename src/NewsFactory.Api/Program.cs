@@ -2,6 +2,8 @@ using Hangfire;
 using Hangfire.PostgreSql;
 using Microsoft.EntityFrameworkCore;
 using NewsFactory.Api;
+using NewsFactory.Api.Admin;
+using NewsFactory.Api.Admin.Auth;
 using NewsFactory.Collection;
 using NewsFactory.Collection.Html;
 using NewsFactory.Collection.Http;
@@ -87,6 +89,8 @@ services.AddTransient<IPublisher>(sp => sp.GetRequiredService<MaxPublisher>());
 services.AddScoped<PublicationService>();
 services.AddScoped<PublishJob>();
 
+services.AddAdmin(config);
+
 services.AddHealthChecks()
     .AddNpgSql(connectionString)
     .AddHangfire(_ => { });
@@ -98,6 +102,7 @@ using (var scope = app.Services.CreateScope())
     var db = scope.ServiceProvider.GetRequiredService<NewsFactoryDbContext>();
     await db.Database.MigrateAsync();
     await SeedData.ApplyAsync(db, config, CancellationToken.None);
+    await AdminUserSeeder.EnsureAdminAsync(db, config, app.Logger, CancellationToken.None);
 }
 
 app.Services.GetRequiredService<IRecurringJobManager>().AddOrUpdate<CollectDueSourcesJob>(
@@ -105,7 +110,7 @@ app.Services.GetRequiredService<IRecurringJobManager>().AddOrUpdate<CollectDueSo
 
 app.UseSerilogRequestLogging();
 app.MapHealthChecks("/health");
-if (app.Environment.IsDevelopment()) app.UseHangfireDashboard("/hangfire");
+app.MapAdmin();
 
 app.Run();
 
