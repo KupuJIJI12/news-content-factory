@@ -26,7 +26,7 @@ public sealed class ProcessStoryJob(NewsFactoryDbContext db, ILlmService llm, IP
 
         try
         {
-            await ProcessAsync(story, forceDraft, hint, ct);
+            await ProcessAsync(story, previous, forceDraft, hint, ct);
         }
         catch (LlmBudgetExceededException ex)
         {
@@ -47,7 +47,7 @@ public sealed class ProcessStoryJob(NewsFactoryDbContext db, ILlmService llm, IP
         }
     }
 
-    private async Task ProcessAsync(Story story, bool forceDraft, string? hint, CancellationToken ct)
+    private async Task ProcessAsync(Story story, StoryStatus previous, bool forceDraft, string? hint, CancellationToken ct)
     {
         var city = story.City!;
         var sources = SourceTextBuilder.Build(story.RawItems
@@ -60,6 +60,16 @@ public sealed class ProcessStoryJob(NewsFactoryDbContext db, ILlmService llm, IP
                 new Dictionary<string, string> { ["city"] = city.Name, ["sources"] = sources }, ctx, ct: ct);
             story.Score = score.Score;
             story.ScoreReason = score.Reason;
+        }
+
+        // Automatic re-run (new source joined) must not overwrite what the moderator wrote: only flag updates.
+        var humanDraft = story.Drafts.Any(d => d.IsCurrent && d.AuthorUserId is not null);
+        if (!forceDraft && hint is null && humanDraft)
+        {
+            story.HasUpdates = true;
+            story.Status = previous == StoryStatus.Processing ? StoryStatus.ReadyForReview : previous;
+            await db.SaveChangesAsync(ct);
+            return;
         }
 
         if (!forceDraft && story.Score is { } s && s < city.ScoreThreshold)
@@ -87,7 +97,7 @@ public sealed class ProcessStoryJob(NewsFactoryDbContext db, ILlmService llm, IP
             Version = story.Drafts.Count == 0 ? 1 : story.Drafts.Max(d => d.Version) + 1,
             Title = rewrite.Title.Trim(),
             Body = rewrite.Body.Trim(),
-            Hashtags = rewrite.Hashtags.Select(NormalizeHashtag).Where(h => h.Length > 1).ToList(),
+            Hashtags = Hashtags.NormalizeAll(rewrite.Hashtags),
             RegenerationHint = hint,
             FactCheckIssues = issues,
             IsCurrent = true,
@@ -105,10 +115,4 @@ public sealed class ProcessStoryJob(NewsFactoryDbContext db, ILlmService llm, IP
             .Include(s => s.RawItems).ThenInclude(r => r.Source)
             .AsSplitQuery()
             .SingleAsync(s => s.Id == id, ct);
-
-    private static string NormalizeHashtag(string tag)
-    {
-        var compact = string.Concat(tag.Where(c => !char.IsWhiteSpace(c))).TrimStart('#');
-        return "#" + compact;
-    }
 }

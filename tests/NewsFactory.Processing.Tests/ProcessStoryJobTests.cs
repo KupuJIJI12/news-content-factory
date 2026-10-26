@@ -149,6 +149,23 @@ public class ProcessStoryJobTests(PostgresFixture db)
     }
 
     [Fact]
+    public async Task Auto_run_does_not_overwrite_human_draft()
+    {
+        var id = await SeedAsync(StoryStatus.ReadyForReview, s =>
+            s.Drafts.Add(new Draft { Version = 2, Title = "Правка модератора", Body = "b", IsCurrent = true, AuthorUserId = 1 }));
+        Score(3); // even a low score must not move a story the moderator works on
+        Rewrite();
+        await RunAsync(id);
+        await using var ctx = db.CreateContext();
+        var story = await ctx.Stories.Include(s => s.Drafts).SingleAsync();
+        Assert.DoesNotContain(_llm.Calls, c => c.Task == LlmTask.Rewrite);
+        Assert.Equal("Правка модератора", story.Drafts.Single(d => d.IsCurrent).Title);
+        Assert.True(story.HasUpdates);
+        Assert.Equal(StoryStatus.ReadyForReview, story.Status);
+        Assert.Equal(3, story.Score);
+    }
+
+    [Fact]
     public async Task Published_story_is_not_touched()
     {
         var id = await SeedAsync(StoryStatus.Published);

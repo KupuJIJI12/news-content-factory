@@ -5,6 +5,7 @@ using Microsoft.AspNetCore.Authentication.Cookies;
 using NewsFactory.Api.Admin.Auth;
 using NewsFactory.Api.Admin.Counters;
 using NewsFactory.Api.Admin.Stories;
+using NewsFactory.Api.Admin.Preview;
 
 namespace NewsFactory.Api.Admin;
 
@@ -40,6 +41,7 @@ public static class AdminSetup
         services.Configure<CountersOptions>(config.GetSection("Admin"));
         services.AddScoped<CountersService>();
         services.AddScoped<StoryQueries>();
+        services.AddScoped<DraftEditor>();
         services.AddHostedService<CountersBroadcaster>();
         return services;
     }
@@ -55,6 +57,7 @@ public static class AdminSetup
         app.MapAuthEndpoints(api);
         api.MapGet("/counters", (CountersService counters, CancellationToken ct) => counters.GetAsync(ct));
         api.MapStoryEndpoints();
+        api.MapPreviewEndpoints();
         app.MapHub<AdminHub>(AdminHub.Path).RequireAuthorization();
         return app;
     }
