@@ -6,6 +6,7 @@ using NewsFactory.Api.Admin.Auth;
 using NewsFactory.Api.Admin.Counters;
 using NewsFactory.Api.Admin.Stories;
 using NewsFactory.Api.Admin.Preview;
+using NewsFactory.Api.Admin.Images;
 
 namespace NewsFactory.Api.Admin;
 
@@ -42,6 +43,8 @@ public static class AdminSetup
         services.AddScoped<CountersService>();
         services.AddScoped<StoryQueries>();
         services.AddScoped<DraftEditor>();
+        services.Configure<ImageStoreOptions>(config.GetSection("Images"));
+        services.AddSingleton<ImageStore>();
         services.AddHostedService<CountersBroadcaster>();
         return services;
     }
@@ -58,6 +61,7 @@ public static class AdminSetup
         api.MapGet("/counters", (CountersService counters, CancellationToken ct) => counters.GetAsync(ct));
         api.MapStoryEndpoints();
         api.MapPreviewEndpoints();
+        api.MapImageEndpoints();
         app.MapHub<AdminHub>(AdminHub.Path).RequireAuthorization();
         return app;
     }
