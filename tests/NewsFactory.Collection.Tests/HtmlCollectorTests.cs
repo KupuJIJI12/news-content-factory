@@ -28,7 +28,9 @@ public class HtmlCollectorTests
             handler.Map("https://site.example/news/" + failing, _ => new HttpResponseMessage(HttpStatusCode.InternalServerError));
         var fetcher = new PoliteHttpFetcher(new HttpClient(handler), new HostThrottle(new FakeTimeProvider(), TimeSpan.Zero));
         var source = new Source { Type = SourceType.Html, Url = config.ListUrl, Config = JsonSerializer.Serialize(config, JsonSerializerOptions.Web) };
-        return await new HtmlCollector(fetcher).CollectAsync(source, default);
+        // Fixed "now" right after the synthetic list dates (21–23.10.2026) so the 48 h cut-off does not depend on the real clock.
+        var now = new FakeTimeProvider(DateTimeOffset.Parse("2026-10-23T12:00:00Z"));
+        return await new HtmlCollector(fetcher, time: now).CollectAsync(source, default);
     }
 
     private static HttpResponseMessage File(string path)
