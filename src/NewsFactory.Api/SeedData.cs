@@ -64,30 +64,30 @@ public static class SeedData
             };
             db.LlmProviders.Add(yandex);
         }
-        if (!await db.LlmProviders.AnyAsync(p => p.Name == "GigaChat", ct))
+        // GigaChat is the main provider (works from Russia, freemium tier for individuals/self-employed).
+        var gigachat = await db.LlmProviders.SingleOrDefaultAsync(p => p.Name == "GigaChat", ct);
+        if (gigachat is null)
         {
-            db.LlmProviders.Add(new LlmProvider
+            gigachat = new LlmProvider
             {
                 Name = "GigaChat", Kind = LlmProviderKind.GigaChat, BaseUrl = "https://gigachat.devices.sberbank.ru/api/v1",
                 ApiKeyEnvVar = "GIGACHAT_AUTH_KEY", AuthUrl = "https://ngw.devices.sberbank.ru:9443/api/v2/oauth",
-                AuthScope = "GIGACHAT_API_PERS", Models = ["GigaChat-2", "GigaChat-2-Pro", "GigaChat-2-Max"], SupportsJsonSchema = false,
-            });
+                AuthScope = string.IsNullOrWhiteSpace(config["GIGACHAT_SCOPE"]) ? "GIGACHAT_API_PERS" : config["GIGACHAT_SCOPE"],
+                Models = ["GigaChat-2", "GigaChat-2-Pro", "GigaChat-2-Max", "GigaChat-3-Ultra"], SupportsJsonSchema = false,
+            };
+            db.LlmProviders.Add(gigachat);
         }
         await db.SaveChangesAsync(ct);
 
-        if (yandex is not null)
+        // YandexGPT stays available as an optional provider but no task is routed to it by default.
+        foreach (var (task, model, temperature) in new[]
+                 {
+                     (LlmTask.Relevance, "GigaChat-2", 0.1), (LlmTask.Clustering, "GigaChat-2", 0.1), (LlmTask.Scoring, "GigaChat-2", 0.1),
+                     (LlmTask.Rewrite, "GigaChat-2-Max", 0.6), (LlmTask.FactCheck, "GigaChat-2-Pro", 0.1),
+                 })
         {
-            var lite = yandex.Models.First(m => m.Contains("yandexgpt-lite"));
-            var pro = yandex.Models.First(m => !m.Contains("yandexgpt-lite"));
-            foreach (var (task, model, temperature) in new[]
-                     {
-                         (LlmTask.Relevance, lite, 0.1), (LlmTask.Clustering, lite, 0.1), (LlmTask.Scoring, lite, 0.1),
-                         (LlmTask.Rewrite, pro, 0.6), (LlmTask.FactCheck, pro, 0.1),
-                     })
-            {
-                if (!await db.LlmTaskSettings.AnyAsync(s => s.Task == task, ct))
-                    db.LlmTaskSettings.Add(new LlmTaskSetting { Task = task, ProviderId = yandex.Id, Model = model, Temperature = temperature });
-            }
+            if (!await db.LlmTaskSettings.AnyAsync(s => s.Task == task, ct))
+                db.LlmTaskSettings.Add(new LlmTaskSetting { Task = task, ProviderId = gigachat.Id, Model = model, Temperature = temperature });
         }
 
         foreach (var task in Enum.GetValues<LlmTask>())

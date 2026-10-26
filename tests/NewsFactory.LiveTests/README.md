@@ -7,8 +7,11 @@
 | Тест | Переменные | Что проверяет |
 |---|---|---|
 | `MaxLiveTests` | `MAX_BOT_TOKEN`, `MAX_TEST_CHAT_ID` | пост с картинкой, жирным и списком появляется в тестовом канале |
-| `YandexLiveTests` | `YANDEX_API_KEY`, `YANDEX_FOLDER_ID`, `NEWSFACTORY_TEST_PG` (или Docker) | оценка, рерайт и проверка фактов реальной новости; ответы печатаются в вывод |
+| `GigaChatLiveTests` | `GIGACHAT_AUTH_KEY` (+ `GIGACHAT_SCOPE`, по умолчанию `GIGACHAT_API_PERS`), `NEWSFACTORY_TEST_PG` (или Docker) | **основной провайдер:** оценка (GigaChat-2), рерайт (GigaChat-2-Max) и проверка фактов (GigaChat-2-Pro) реальной новости; ответы и расход токенов печатаются в вывод |
+| `YandexLiveTests` | `YANDEX_API_KEY`, `YANDEX_FOLDER_ID`, `NEWSFACTORY_TEST_PG` (или Docker) | необязательный провайдер: тот же сценарий на YandexGPT |
 | `SourcesLiveTests` | `LIVE_SOURCES=1` (+ `VK_SERVICE_TOKEN` для VK) | все 7 источников отдают новости / открываются |
+
+`GIGACHAT_AUTH_KEY` — «Authorization key» из личного кабинета GigaChat API (developers.sber.ru → проект GigaChat API → «Получить ключ»), уже в формате Base64.
 
 Пример (PowerShell):
 

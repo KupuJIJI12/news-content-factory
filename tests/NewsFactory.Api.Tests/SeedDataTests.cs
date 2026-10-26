@@ -29,8 +29,6 @@ public class SeedDataTests(PostgresFixture db)
         Assert.Equal(3, (await read.Channels.SingleAsync()).DailyLimit);
         Assert.True((await read.Channels.SingleAsync()).IsEnabled);
         Assert.Equal(5, await read.PromptTemplates.CountAsync());
-        Assert.Equal("gpt://f1/yandexgpt/latest", (await read.LlmTaskSettings.SingleAsync(s => s.Task == LlmTask.Rewrite)).Model);
-        Assert.Equal("gpt://f1/yandexgpt-lite/latest", (await read.LlmTaskSettings.SingleAsync(s => s.Task == LlmTask.Scoring)).Model);
         Assert.Equal("f1", (await read.LlmProviders.SingleAsync(p => p.Name == "YandexGPT")).Headers["OpenAI-Project"]);
         Assert.Equal("500000", (await read.AppSettings.SingleAsync(s => s.Key == "DailyTokenBudget")).Value);
         var city = await read.Cities.SingleAsync();
@@ -56,13 +54,43 @@ public class SeedDataTests(PostgresFixture db)
     }
 
     [Fact]
+    public async Task All_tasks_are_routed_to_gigachat()
+    {
+        await db.ResetAsync();
+        await using (var ctx = db.CreateContext()) await SeedData.ApplyAsync(ctx, Config(("YANDEX_FOLDER_ID", "f1")), default);
+        await using var read = db.CreateContext();
+        var settings = await read.LlmTaskSettings.Include(s => s.Provider).ToDictionaryAsync(s => s.Task);
+        Assert.Equal(5, settings.Count);
+        Assert.All(settings.Values, s => Assert.Equal("GigaChat", s.Provider!.Name));
+        Assert.Equal("GigaChat-2", settings[LlmTask.Relevance].Model);
+        Assert.Equal("GigaChat-2", settings[LlmTask.Clustering].Model);
+        Assert.Equal("GigaChat-2", settings[LlmTask.Scoring].Model);
+        Assert.Equal("GigaChat-2-Max", settings[LlmTask.Rewrite].Model);
+        Assert.Equal("GigaChat-2-Pro", settings[LlmTask.FactCheck].Model);
+        Assert.Contains("GigaChat-3-Ultra", settings[LlmTask.Rewrite].Provider!.Models);
+    }
+
+    [Fact]
+    public async Task Gigachat_scope_comes_from_config_with_personal_default()
+    {
+        await db.ResetAsync();
+        await using (var ctx = db.CreateContext()) await SeedData.ApplyAsync(ctx, Config(), default);
+        await using (var read = db.CreateContext())
+            Assert.Equal("GIGACHAT_API_PERS", (await read.LlmProviders.SingleAsync(p => p.Name == "GigaChat")).AuthScope);
+
+        await db.ResetAsync();
+        await using (var ctx = db.CreateContext()) await SeedData.ApplyAsync(ctx, Config(("GIGACHAT_SCOPE", "GIGACHAT_API_B2B")), default);
+        await using (var read = db.CreateContext())
+            Assert.Equal("GIGACHAT_API_B2B", (await read.LlmProviders.SingleAsync(p => p.Name == "GigaChat")).AuthScope);
+    }
+
+    [Fact]
     public async Task Without_folder_id_yandex_provider_is_not_seeded()
     {
         await db.ResetAsync();
         await using (var ctx = db.CreateContext()) await SeedData.ApplyAsync(ctx, Config(), default);
         await using var read = db.CreateContext();
         Assert.Equal(["GigaChat"], await read.LlmProviders.Select(p => p.Name).ToListAsync());
-        Assert.Empty(await read.LlmTaskSettings.ToListAsync());
     }
 
     [Fact]
