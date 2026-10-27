@@ -70,7 +70,7 @@ public static class ListPageAnalyzer
 
         var linkSelector = PickLinkSelector(items, pageUrl, host);
         if (linkSelector is null) return null;
-        var titles = items.Select(i => TitleLink(i.QuerySelector(linkSelector), pageUrl, host)).Where(t => t is not null).Select(t => t!.Value).ToList();
+        var titles = items.Select(i => TitleLink(Find(i, linkSelector), pageUrl, host)).Where(t => t is not null).Select(t => t!.Value).ToList();
         if (titles.Count < MinItems || titles.Count < items.Length * MinShare) return null;
         if (titles.Select(t => t.Url).Distinct().Count() < MinItems) return null;
 
@@ -81,7 +81,7 @@ public static class ListPageAnalyzer
         var lengthFactor = Math.Pow(avgLength / 60.0, 2);
         var sections = titles.GroupBy(t => FirstSegment(t.Url)).Max(g => g.Count()) / (double)titles.Count;
         var articleLike = titles.Count(t => LooksLikeArticle(t.Url)) / (double)titles.Count;
-        var nested = items.Count(i => i.QuerySelector("ul, ol") is not null) / (double)items.Length;
+        var nested = items.Count(i => Find(i, "ul, ol") is not null) / (double)items.Length;
         var score = Math.Sqrt(titles.Count) * lengthFactor * sections * (0.5 + articleLike) * (dateSelector is null ? 1 : 3)
                     * (titles.Count / (double)items.Length) * (1 - nested * 0.8);
         var config = new HtmlSourceConfig(pageUrl.ToString(), itemSelector, linkSelector, DateSelector: dateSelector);
@@ -128,12 +128,12 @@ public static class ListPageAnalyzer
                 // Stable hooks first: <time> and data-*date* attributes survive site redesigns better than generated classes.
                 if (el.LocalName == "time") options.Add("time");
                 var dataAttr = el.Attributes.FirstOrDefault(a => a.Name.StartsWith("data-") && a.Name.Contains("date"));
-                if (dataAttr is not null) options.Add($"[{dataAttr.Name}]");
+                if (dataAttr is not null) options.Add($"[{Css(dataAttr.Name)}]");
                 foreach (var cls in el.ClassList) options.Add($"{el.LocalName}.{Css(cls)}");
             }
         }
         return options.Distinct().FirstOrDefault(sel =>
-            items.Count(i => i.QuerySelector(sel) is { } d && IsDate(d)) >= items.Length * MinShare);
+            items.Count(i => Find(i, sel) is { } d && IsDate(d)) >= items.Length * MinShare);
     }
 
     private static bool IsDate(IElement el)
@@ -178,8 +178,25 @@ public static class ListPageAnalyzer
         return parent is null ? null : $"{parent} > {e.LocalName}";
     }
 
-    private static string Css(string ident) => string.Concat(ident.Select(ch =>
-        char.IsLetterOrDigit(ch) || ch is '-' or '_' ? ch.ToString() : "\\" + ch));
+    /// <summary>Escapes an identifier like CSS.escape: a leading digit becomes a hex escape, other specials get a backslash.</summary>
+    private static string Css(string ident)
+    {
+        var sb = new System.Text.StringBuilder();
+        for (var i = 0; i < ident.Length; i++)
+        {
+            var ch = ident[i];
+            var leadingDigit = char.IsAsciiDigit(ch) && (i == 0 || (i == 1 && ident[0] == '-'));
+            if (leadingDigit) sb.Append($"\\{(int)ch:x} ");
+            else if (char.IsLetterOrDigit(ch) || ch is '-' or '_') sb.Append(ch);
+            else sb.Append('\\').Append(ch);
+        }
+        return sb.ToString();
+    }
+
+    private static IElement? Find(IElement scope, string selector)
+    {
+        try { return scope.QuerySelector(selector); } catch (DomException) { return null; }
+    }
 
     private static string Host(Uri u) => u.Host.StartsWith("www.", StringComparison.OrdinalIgnoreCase) ? u.Host[4..].ToLowerInvariant() : u.Host.ToLowerInvariant();
 

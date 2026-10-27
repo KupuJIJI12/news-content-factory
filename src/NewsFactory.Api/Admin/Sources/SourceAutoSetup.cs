@@ -57,11 +57,19 @@ public sealed class SourceAutoSetup(IPageFetcher fetcher, ILlmService llm, TimeP
         if (await new FeedDiscovery(fetcher).FindAsync(page.FinalUrl, page.Content, ct) is { } feed)
             return new AutoSetupResult(true, "Rss", SourceType.Rss, feed.Url, null, Preview(feed.Items), $"Найдена RSS-лента: {feed.Url}");
 
-        foreach (var candidate in ListPageAnalyzer.Suggest(page.Content, page.FinalUrl).Take(3))
+        try
         {
-            var check = await CheckAsync(candidate.Config, page, ct);
-            if (check.Items is not null)
-                return Html("Heuristic", candidate.Config, check.Items, "Список новостей определён по структуре страницы");
+            foreach (var candidate in ListPageAnalyzer.Suggest(page.Content, page.FinalUrl).Take(3))
+            {
+                var check = await CheckAsync(candidate.Config, page, ct);
+                if (check.Items is not null)
+                    return Html("Heuristic", candidate.Config, check.Items, "Список новостей определён по структуре страницы");
+            }
+        }
+        catch (Exception ex) when (!ct.IsCancellationRequested && ex is not OperationCanceledException)
+        {
+            // Unusual markup must not break auto-setup: fall through to the LLM step.
+            log.LogWarning(ex, "Разбор структуры страницы {Url} не удался", url);
         }
 
         string why;

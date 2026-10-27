@@ -49,4 +49,17 @@ public class ListPageAnalyzerTests
             """;
         Assert.Empty(ListPageAnalyzer.Suggest(html, new Uri("https://card.example/")));
     }
+
+    [Fact]
+    public void Classes_and_attributes_that_are_not_plain_css_identifiers_do_not_break_analysis()
+    {
+        // Leading digits (Tailwind "2xl:", "2col") and dots in attribute names used to throw DomException → HTTP 500.
+        var html = "<html><body><div class=\"1news 2xl:grid\">" + string.Concat(Enumerable.Range(1, 4).Select(i =>
+            $"<div class=\"2col item\"><span class=\"2col\" data-date.x=\"1\">1{i}.10.2026</span><a href=\"/news/{i}.html\">Заголовок новости номер {i} про город</a></div>")) +
+            "</div></body></html>";
+        var page = new Uri("https://site.example/news/");
+        var best = ListPageAnalyzer.Suggest(html, page).First();
+        Assert.Equal(4, ListPageAnalyzer.ListItems(html, page, best.Config).Count);
+        Assert.NotNull(best.Config.DateSelector);
+    }
 }

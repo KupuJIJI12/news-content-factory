@@ -15,7 +15,11 @@ public class FeedDiscoveryTests
     public async Task Finds_feed_by_link_tag()
     {
         var handler = new StubHttpHandler().MapFile("https://site.example/feeds/main.xml", "Fixtures/rss/synthetic.xml", "application/rss+xml");
-        const string page = """<html><head><link rel="alternate" type="application/rss+xml" title="Новости" href="/feeds/main.xml"></head><body></body></html>""";
+        // A section page: the feed counts because its items are the ones listed on the page.
+        const string page = """
+            <html><head><link rel="alternate" type="application/rss+xml" title="Новости" href="/feeds/main.xml"></head>
+            <body><a href="https://feed.example/news/1">Первая</a><a href="https://feed.example/news/2">Вторая</a></body></html>
+            """;
 
         var found = await new FeedDiscovery(Fetcher(handler)).FindAsync(new Uri("https://site.example/news/"), page, default);
         Assert.NotNull(found);
@@ -30,7 +34,7 @@ public class FeedDiscoveryTests
             .Map("https://site.example/rss", HttpStatusCode.OK, "<html>не лента</html>", "text/html")
             .MapFile("https://site.example/feed/", "Fixtures/rss/synthetic.xml", "application/rss+xml");
 
-        var found = await new FeedDiscovery(Fetcher(handler)).FindAsync(new Uri("https://site.example/news/"), "<html><body></body></html>", default);
+        var found = await new FeedDiscovery(Fetcher(handler)).FindAsync(new Uri("https://site.example/"), "<html><body></body></html>", default);
         Assert.Equal("https://site.example/feed/", found?.Url);
     }
 
@@ -47,6 +51,18 @@ public class FeedDiscoveryTests
     public async Task No_feed_gives_null()
     {
         var found = await new FeedDiscovery(Fetcher(new StubHttpHandler())).FindAsync(new Uri("https://site.example/"), "<html></html>", default);
+        Assert.Null(found);
+    }
+
+    [Fact]
+    public async Task Site_wide_feed_does_not_replace_a_tag_page()
+    {
+        // 63.ru tag page «Отрадный» announces the feed of the whole site; its items are not the ones on the page.
+        var handler = new StubHttpHandler().MapFile("https://63.ru/rss-feeds/rss.xml", "Fixtures/rss/synthetic.xml", "application/rss+xml");
+        var html = await File.ReadAllTextAsync("Fixtures/html/63ru-list.html");
+        Assert.Contains("rss-feeds/rss.xml", html);
+
+        var found = await new FeedDiscovery(Fetcher(handler)).FindAsync(new Uri("https://63.ru/text/tags/otradnyy/"), html, default);
         Assert.Null(found);
     }
 }

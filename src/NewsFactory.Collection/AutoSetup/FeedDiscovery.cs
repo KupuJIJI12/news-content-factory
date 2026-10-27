@@ -1,6 +1,7 @@
 using AngleSharp.Html.Parser;
 using NewsFactory.Collection.Http;
 using NewsFactory.Collection.Rss;
+using NewsFactory.Collection.Text;
 using NewsFactory.Domain;
 using NewsFactory.Domain.Entities;
 
@@ -19,13 +20,20 @@ public sealed class FeedDiscovery(IPageFetcher fetcher)
 
     public async Task<FeedFound?> FindAsync(Uri pageUrl, string pageContent, CancellationToken ct)
     {
+        // On a section or tag page a site-wide feed is not what the moderator asked for: such a feed counts
+        // only if its items are the news listed on that page.
+        var isRoot = pageUrl.AbsolutePath.Trim('/').Length == 0;
+        var pageLinks = isRoot ? null : PageLinks(pageUrl, pageContent);
         foreach (var candidate in Candidates(pageUrl, pageContent).Take(MaxCandidates))
         {
             ct.ThrowIfCancellationRequested();
             try
             {
                 var items = await new RssCollector(fetcher).CollectAsync(new Source { Type = SourceType.Rss, Url = candidate }, ct);
-                if (items.Count > 0) return new FeedFound(candidate, items);
+                if (items.Count == 0) continue;
+                var isSelf = candidate == pageUrl.ToString();
+                if (pageLinks is not null && !isSelf && !MatchesPage(items, pageLinks)) continue;
+                return new FeedFound(candidate, items);
             }
             catch (Exception ex) when (!ct.IsCancellationRequested && ex is not OperationCanceledException)
             {
@@ -33,6 +41,17 @@ public sealed class FeedDiscovery(IPageFetcher fetcher)
             }
         }
         return null;
+    }
+
+    private static HashSet<string> PageLinks(Uri pageUrl, string pageContent) =>
+        new HtmlParser().ParseDocument(pageContent).QuerySelectorAll("a[href]")
+            .Select(a => Uri.TryCreate(pageUrl, a.GetAttribute("href"), out var u) ? UrlNormalizer.Normalize(u.ToString()) : null)
+            .OfType<string>().ToHashSet();
+
+    private static bool MatchesPage(IReadOnlyList<CollectedItem> items, HashSet<string> pageLinks)
+    {
+        var onPage = items.Count(i => pageLinks.Contains(UrlNormalizer.Normalize(i.Url)));
+        return onPage >= Math.Min(2, items.Count) && onPage >= items.Count * 0.3;
     }
 
     private static IEnumerable<string> Candidates(Uri pageUrl, string pageContent)
