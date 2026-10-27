@@ -7,7 +7,7 @@ import { useSave } from './useSave'
 
 const providersKey = ['settings', 'providers'] as const
 const tasksKey = ['settings', 'llmTasks'] as const
-const TASK_LABEL: Record<string, string> = { Relevance: 'Релевантность', Clustering: 'Сюжеты', Scoring: 'Оценка', Rewrite: 'Рерайт', FactCheck: 'Факт-чек' }
+const TASK_LABEL: Record<string, string> = { Relevance: 'Релевантность', Clustering: 'Сюжеты', Scoring: 'Оценка', Rewrite: 'Рерайт', FactCheck: 'Факт-чек', SourceSetup: 'Автонастройка' }
 
 const empty: LlmProviderInput = {
   name: '', kind: 'OpenAiCompatible', baseUrl: 'https://', apiKeyEnvVar: '', models: [], headers: {},

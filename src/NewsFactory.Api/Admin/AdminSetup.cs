@@ -50,6 +50,7 @@ public static class AdminSetup
         services.Configure<ImageStoreOptions>(config.GetSection("Images"));
         services.AddSingleton<ImageStore>();
         services.AddScoped<SourceTester>();
+        services.AddScoped<SourceAutoSetup>();
         services.AddHostedService<CountersBroadcaster>();
         return services;
     }

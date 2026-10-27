@@ -13,6 +13,7 @@ public static partial class PromptVariables
         [LlmTask.Scoring] = (["city", "sources"], []),
         [LlmTask.Rewrite] = (["city", "sources"], ["hint"]),
         [LlmTask.FactCheck] = (["sources", "draft"], []),
+        [LlmTask.SourceSetup] = (["url", "page"], []),
     };
 
     private static readonly Dictionary<string, string> Descriptions = new()
@@ -24,6 +25,8 @@ public static partial class PromptVariables
         ["sources"] = "Тексты всех источников сюжета с названиями источников и датами",
         ["draft"] = "Готовый пост (заголовок и текст), который нужно проверить",
         ["hint"] = "Пожелание модератора к новой версии; пусто, если пожелания нет",
+        ["url"] = "Адрес страницы со списком новостей, которую настраивают",
+        ["page"] = "Упрощённый скелет HTML этой страницы: теги, классы, ссылки и начало текстов",
     };
 
     private static readonly Dictionary<LlmTask, string> TaskDescriptions = new()
@@ -33,6 +36,7 @@ public static partial class PromptVariables
         [LlmTask.Scoring] = "Оценивает интерес сюжета для жителей по шкале от 1 до 10",
         [LlmTask.Rewrite] = "Пишет пост по источникам сюжета в редакционном стиле",
         [LlmTask.FactCheck] = "Сверяет готовый пост с источниками и ищет неточности",
+        [LlmTask.SourceSetup] = "Подбирает CSS-селекторы списка новостей при автонастройке источника, если не нашлось RSS и не помогла структура страницы",
     };
 
     public sealed record Variable(string Name, string Description, bool Required);

@@ -91,6 +91,7 @@ public static class SeedData
                  {
                      (LlmTask.Relevance, "GigaChat-2", 0.1), (LlmTask.Clustering, "GigaChat-2", 0.1), (LlmTask.Scoring, "GigaChat-2", 0.1),
                      (LlmTask.Rewrite, "GigaChat-2-Max", 0.6), (LlmTask.FactCheck, "GigaChat-2-Pro", 0.1),
+                     (LlmTask.SourceSetup, "GigaChat-2-Pro", 0.1),
                  })
         {
             if (!await db.LlmTaskSettings.AnyAsync(s => s.Task == task, ct))

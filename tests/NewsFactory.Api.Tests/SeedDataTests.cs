@@ -28,7 +28,7 @@ public class SeedDataTests(PostgresFixture db)
         Assert.Equal(7, await read.Sources.CountAsync());
         Assert.Equal(3, (await read.Channels.SingleAsync()).DailyLimit);
         Assert.True((await read.Channels.SingleAsync()).IsEnabled);
-        Assert.Equal(5, await read.PromptTemplates.CountAsync());
+        Assert.Equal(6, await read.PromptTemplates.CountAsync());
         Assert.Equal("f1", (await read.LlmProviders.SingleAsync(p => p.Name == "YandexGPT")).Headers["OpenAI-Project"]);
         Assert.Equal("500000", (await read.AppSettings.SingleAsync(s => s.Key == "DailyTokenBudget")).Value);
         var city = await read.Cities.SingleAsync();
@@ -92,13 +92,14 @@ public class SeedDataTests(PostgresFixture db)
         await using (var ctx = db.CreateContext()) await SeedData.ApplyAsync(ctx, Config(("YANDEX_FOLDER_ID", "f1")), default);
         await using var read = db.CreateContext();
         var settings = await read.LlmTaskSettings.Include(s => s.Provider).ToDictionaryAsync(s => s.Task);
-        Assert.Equal(5, settings.Count);
+        Assert.Equal(6, settings.Count);
         Assert.All(settings.Values, s => Assert.Equal("GigaChat", s.Provider!.Name));
         Assert.Equal("GigaChat-2", settings[LlmTask.Relevance].Model);
         Assert.Equal("GigaChat-2", settings[LlmTask.Clustering].Model);
         Assert.Equal("GigaChat-2", settings[LlmTask.Scoring].Model);
         Assert.Equal("GigaChat-2-Max", settings[LlmTask.Rewrite].Model);
         Assert.Equal("GigaChat-2-Pro", settings[LlmTask.FactCheck].Model);
+        Assert.Equal("GigaChat-2-Pro", settings[LlmTask.SourceSetup].Model);
         Assert.Contains("GigaChat-3-Ultra", settings[LlmTask.Rewrite].Provider!.Models);
     }
 

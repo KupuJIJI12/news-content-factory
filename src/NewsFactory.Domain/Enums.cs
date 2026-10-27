@@ -21,7 +21,7 @@ public enum Platform { Max }
 
 public enum PublicationStatus { Scheduled, Sending, Published, Failed, Unknown, Cancelled }
 
-public enum LlmTask { Relevance, Clustering, Scoring, Rewrite, FactCheck }
+public enum LlmTask { Relevance, Clustering, Scoring, Rewrite, FactCheck, SourceSetup }
 
 public enum LlmProviderKind { OpenAiCompatible, GigaChat }
 

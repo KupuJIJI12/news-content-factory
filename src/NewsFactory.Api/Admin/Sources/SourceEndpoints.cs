@@ -44,6 +44,11 @@ public static class SourceEndpoints
             return Results.Ok(await DtoAsync(db, id, time.GetUtcNow(), ct));
         });
 
+        api.MapPost("/sources/autodetect", async (AutoSetupRequest r, SourceAutoSetup setup, CancellationToken ct) =>
+            Uri.TryCreate(r.Url?.Trim(), UriKind.Absolute, out var url) && url.Scheme is "http" or "https"
+                ? Results.Ok(await setup.RunAsync(url, ct))
+                : Problems.Validation("Проверьте адрес", new Dictionary<string, string[]> { ["url"] = ["Нужен полный адрес http(s)://…"] }));
+
         api.MapPost("/sources/test", async (SourceInput input, SourceTester tester, CancellationToken ct) =>
             input.Validate(requireCities: false) is { Count: > 0 } errors
                 ? Problems.Validation("Проверьте поля источника", errors)

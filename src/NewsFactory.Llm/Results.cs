@@ -28,3 +28,11 @@ public sealed record LlmFactIssue(
 
 public sealed record FactCheckResult(
     [property: Required(ErrorMessage = "Поле issues обязательно")] LlmFactIssue[] Issues);
+
+/// <summary>CSS selectors for a news list page suggested by the LLM (validated by actually collecting with them).</summary>
+public sealed record SourceSetupResult(
+    [property: Required(ErrorMessage = "Поле itemSelector обязательно")] string ItemSelector,
+    [property: Required(ErrorMessage = "Поле linkSelector обязательно")] string LinkSelector,
+    string? TitleSelector,
+    string? DateSelector,
+    string? DateFormat);

@@ -10,6 +10,7 @@ public class PromptVariablesTests
     [InlineData(LlmTask.Scoring)]
     [InlineData(LlmTask.Rewrite)]
     [InlineData(LlmTask.FactCheck)]
+    [InlineData(LlmTask.SourceSetup)]
     public void Defaults_are_valid(LlmTask task) => Assert.Empty(PromptVariables.Validate(task, DefaultPrompts.Get(task)));
 
     [Fact]

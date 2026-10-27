@@ -9,7 +9,7 @@ import { formatInCity } from '../lib/cityTime'
 import { useCityTimeZone } from '../lib/useCityTimeZone'
 
 const TASK_LABEL: Record<LlmTask, string> = {
-  Relevance: 'Релевантность', Clustering: 'Сюжеты', Scoring: 'Оценка', Rewrite: 'Рерайт', FactCheck: 'Факт-чек',
+  Relevance: 'Релевантность', Clustering: 'Сюжеты', Scoring: 'Оценка', Rewrite: 'Рерайт', FactCheck: 'Факт-чек', SourceSetup: 'Автонастройка',
 }
 const promptsKey = ['settings', 'prompts'] as const
 

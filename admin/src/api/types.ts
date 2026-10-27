@@ -8,7 +8,7 @@ export type QueueTab = 'Review' | 'LowInterest' | 'Scheduled' | 'Published' | 'R
 export type SourceType = 'Rss' | 'Html' | 'Vk'
 export type SourceHealthStatus = 'Ok' | 'Failing' | 'Silent'
 export type Platform = 'Max'
-export type LlmTask = 'Relevance' | 'Clustering' | 'Scoring' | 'Rewrite' | 'FactCheck'
+export type LlmTask = 'Relevance' | 'Clustering' | 'Scoring' | 'Rewrite' | 'FactCheck' | 'SourceSetup'
 export type LlmProviderKind = 'OpenAiCompatible' | 'GigaChat'
 export type FactCheckIssueSource = 'Deterministic' | 'Llm'
 
