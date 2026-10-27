@@ -154,7 +154,7 @@ public class SourceEndpointsTests(PostgresFixture db)
     private sealed record CityLink(long CityId, bool IsDedicated);
 
     [Fact]
-    public async Task Source_links_to_several_cities_with_own_dedicated_flag()
+    public async Task Source_belongs_to_one_city_and_url_is_unique_per_city()
     {
         await using var host = await StartAsync();
         var otradny = await CityIdAsync(host);
@@ -162,21 +162,28 @@ public class SourceEndpointsTests(PostgresFixture db)
                 new { name = "Похвистнево", timeZone = "Europe/Samara", keywords = new[] { "похвистн" }, scoreThreshold = 6 }))
             .Content.ReadFromJsonAsync<JsonElement>()).GetProperty("id").GetInt64();
 
-        var body = new SourceBody("Областное СМИ", SourceType.Rss, "https://region.example/rss", null, 60, 24, false, null, true,
-            [new CityLink(otradny, true), new CityLink(other, false)]);
-        var created = (await (await host.PostJsonAsync("/api/sources", body)).Content.ReadFromJsonAsync<SourceDto>(AdminTestHost.Json))!;
-        Assert.Equal([(otradny, true), (other, false)], created.Cities.OrderBy(c => c.CityId).Select(c => (c.CityId, c.IsDedicated)));
+        // One item goes to one story of one city, so a source cannot serve two cities at once.
+        var body = new SourceBody("450media для Похвистнево", SourceType.Rss, "https://450media.ru/rss/", null, 60, 24, false, null, true,
+            [new CityLink(otradny, false), new CityLink(other, false)]);
+        var two = await host.PostJsonAsync("/api/sources", body);
+        Assert.Equal(HttpStatusCode.BadRequest, two.StatusCode);
+        Assert.True((await two.Content.ReadFromJsonAsync<JsonElement>()).GetProperty("errors").TryGetProperty("cities", out _));
+
+        // The regional feed already used by Отрадный can be added for another city as its own source.
+        var created = await host.PostJsonAsync("/api/sources", body with { Cities = [new CityLink(other, false)] });
+        Assert.Equal(HttpStatusCode.Created, created.StatusCode);
+        var dto = (await created.Content.ReadFromJsonAsync<SourceDto>(AdminTestHost.Json))!;
+        Assert.Equal([(other, "Похвистнево", false)], dto.Cities.Select(c => (c.CityId, c.CityName, c.IsDedicated)));
+        Assert.Equal(HttpStatusCode.Conflict, (await host.PostJsonAsync("/api/sources", body with { Cities = [new CityLink(other, true)] })).StatusCode);
 
         var onlyOther = await host.GetJsonAsync<List<SourceDto>>($"/api/sources?cityId={other}");
-        Assert.Equal(["Областное СМИ"], onlyOther.Select(s => s.Name));
+        Assert.Equal(["450media для Похвистнево"], onlyOther.Select(s => s.Name));
 
-        var update = await host.PutJsonAsync($"/api/sources/{created.Id}", body with { Cities = [new CityLink(other, true)] });
+        var update = await host.PutJsonAsync($"/api/sources/{dto.Id}", body with { Cities = [new CityLink(other, true)] });
         Assert.Equal(HttpStatusCode.OK, update.StatusCode);
-        var links = await host.WithDbAsync(d => d.SourceCities.Where(sc => sc.SourceId == created.Id).ToListAsync());
+        var links = await host.WithDbAsync(d => d.SourceCities.Where(sc => sc.SourceId == dto.Id).ToListAsync());
         Assert.Equal([(other, true)], links.Select(l => (l.CityId, l.IsDedicated)));
 
-        var noCities = await host.PostJsonAsync("/api/sources", body with { Url = "https://x.example/rss", Cities = [] });
-        Assert.Equal(HttpStatusCode.BadRequest, noCities.StatusCode);
         var unknownCity = await host.PostJsonAsync("/api/sources", body with { Url = "https://y.example/rss", Cities = [new CityLink(999999, false)] });
         Assert.Equal(HttpStatusCode.BadRequest, unknownCity.StatusCode);
     }

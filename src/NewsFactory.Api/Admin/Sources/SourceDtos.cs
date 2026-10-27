@@ -24,8 +24,9 @@ public sealed record SourceInput(string? Name, SourceType Type, string? Url, str
     public Dictionary<string, string[]> Validate(bool requireCities = true)
     {
         var errors = new Dictionary<string, string[]>();
-        if (requireCities && (Cities is null || Cities.Count == 0)) errors["cities"] = ["Выберите хотя бы один город"];
-        else if (Cities is not null && Cities.Select(c => c.CityId).Distinct().Count() != Cities.Count) errors["cities"] = ["Город указан дважды"];
+        // Each raw item ends up in one story of one city, so a source serves exactly one city;
+        // a regional feed used by several cities is added once per city.
+        if (requireCities && Cities is not { Count: 1 }) errors["cities"] = ["Выберите город источника (ровно один)"];
         if (string.IsNullOrWhiteSpace(Name)) errors["name"] = ["Укажите название"];
         if (!Uri.TryCreate(Url, UriKind.Absolute, out var uri) || uri.Scheme is not ("http" or "https"))
             errors["url"] = ["Нужен полный адрес http(s)://…"];

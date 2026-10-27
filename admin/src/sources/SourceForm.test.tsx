@@ -69,26 +69,23 @@ describe('SourceForm', () => {
     expect(screen.getByText(/Фото: 2/)).toBeInTheDocument()
   })
 
-  it('sends cities with dedicated flags', async () => {
+  it('sends the chosen city with its dedicated flag', async () => {
     vi.mocked(cities.listCities).mockImplementation(async () => [city(1, 'Отрадный'), city(2, 'Кинель')])
     vi.mocked(api.createSource).mockImplementation(async (i) => ({ ...i, id: 9 }) as never)
     renderWithProviders(<SourceForm source={null} onSaved={() => {}} />)
-    set(/Название/, 'Областная газета')
-    set(/^Адрес/, 'https://region.example/rss')
-    await userEvent.click(await screen.findByRole('checkbox', { name: 'Отрадный' }))
-    await userEvent.click(screen.getByRole('checkbox', { name: 'Кинель' }))
+    set(/Название/, 'Кинель-Информ')
+    set(/^Адрес/, 'https://kinel.example/rss')
+    await userEvent.click(await screen.findByRole('radio', { name: 'Кинель' }))
     await userEvent.click(screen.getByRole('switch', { name: 'Все новости источника — про Кинель' }))
     await userEvent.click(screen.getByRole('button', { name: 'Сохранить' }))
     await waitFor(() => expect(api.createSource).toHaveBeenCalled())
-    expect(vi.mocked(api.createSource).mock.calls[0][0].cities).toEqual([
-      { cityId: 1, isDedicated: false }, { cityId: 2, isDedicated: true },
-    ])
+    expect(vi.mocked(api.createSource).mock.calls[0][0].cities).toEqual([{ cityId: 2, isDedicated: true }])
   })
 
   it('preselects the only city', async () => {
     vi.mocked(api.createSource).mockImplementation(async (i) => ({ ...i, id: 9 }) as never)
     renderWithProviders(<SourceForm source={null} onSaved={() => {}} />)
-    expect(await screen.findByRole('checkbox', { name: 'Отрадный' })).toBeChecked()
+    expect(await screen.findByRole('radio', { name: 'Отрадный' })).toBeChecked()
   })
 
   it('autodetect fills the form and shows found items', async () => {

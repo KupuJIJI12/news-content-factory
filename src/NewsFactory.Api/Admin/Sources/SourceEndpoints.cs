@@ -21,7 +21,7 @@ public static class SourceEndpoints
         {
             if (input.Validate() is { Count: > 0 } errors) return Problems.Validation("Проверьте поля источника", errors);
             if (await UnknownCitiesAsync(db, input, ct) is { } unknown) return unknown;
-            if (await db.Sources.AnyAsync(s => s.Url == input.Url, ct)) return Problems.Conflict("conflict", "Источник с таким адресом уже есть");
+            if (await UrlTakenAsync(db, input, null, ct)) return Problems.Conflict("conflict", "У этого города уже есть источник с таким адресом");
             var source = new Source();
             Apply(source, input);
             SyncCities(source, input);
@@ -36,8 +36,8 @@ public static class SourceEndpoints
             if (source is null) return Problems.NotFound("Источник");
             if (input.Validate() is { Count: > 0 } errors) return Problems.Validation("Проверьте поля источника", errors);
             if (await UnknownCitiesAsync(db, input, ct) is { } unknown) return unknown;
-            if (await db.Sources.AnyAsync(s => s.Url == input.Url && s.Id != id, ct))
-                return Problems.Conflict("conflict", "Источник с таким адресом уже есть");
+            if (await UrlTakenAsync(db, input, id, ct))
+                return Problems.Conflict("conflict", "У этого города уже есть источник с таким адресом");
             Apply(source, input);
             SyncCities(source, input);
             await db.SaveChangesAsync(ct);
@@ -79,6 +79,13 @@ public static class SourceEndpoints
             if (link is null) source.Cities.Add(new SourceCity { Source = source, CityId = cityId, IsDedicated = dedicated });
             else link.IsDedicated = dedicated;
         }
+    }
+
+    private static Task<bool> UrlTakenAsync(NewsFactoryDbContext db, SourceInput input, long? exceptId, CancellationToken ct)
+    {
+        var url = input.Url!.Trim();
+        var cityId = input.Cities![0].CityId;
+        return db.Sources.AnyAsync(s => s.Url == url && s.Id != exceptId && s.Cities.Any(c => c.CityId == cityId), ct);
     }
 
     private static async Task<IResult?> UnknownCitiesAsync(NewsFactoryDbContext db, SourceInput input, CancellationToken ct)
