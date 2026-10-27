@@ -1,6 +1,7 @@
 using Hangfire;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Logging;
+using NewsFactory.Collection.Text;
 using NewsFactory.Domain;
 using NewsFactory.Domain.Abstractions;
 using NewsFactory.Domain.Entities;
@@ -16,6 +17,9 @@ public sealed class CollectSourceJob(
     ILogger<CollectSourceJob> log)
 {
     public static readonly TimeSpan MaxAge = TimeSpan.FromHours(48);
+    /// <summary>The same headline from the same source within this window is the same news under another link.</summary>
+    public static readonly TimeSpan DuplicateWindow = TimeSpan.FromHours(72);
+    private const int MinTitleKeyLength = 15;
 
     [DisableConcurrentExecution("collect-source:{0}", 600)]
     public async Task RunAsync(long sourceId, CancellationToken ct)
@@ -43,28 +47,40 @@ public sealed class CollectSourceJob(
         source.LastError = null;
         source.LastSuccessAt = now;
 
-        var ids = items.Select(i => i.ExternalId).Distinct().ToList();
+        // Ids are compared in normalized form; the original spelling is checked too for items stored before normalization.
+        var ids = items.SelectMany(i => new[] { i.ExternalId, UrlNormalizer.Normalize(i.ExternalId) }).Distinct().ToList();
         var known = await db.RawItems
             .Where(r => r.SourceId == sourceId && ids.Contains(r.ExternalId))
             .Select(r => r.ExternalId)
             .ToListAsync(ct);
         var seen = known.ToHashSet();
+        var since = now - DuplicateWindow;
+        var recentTitles = (await db.RawItems
+                .Where(r => r.SourceId == sourceId && r.CollectedAt >= since)
+                .Select(r => r.Title)
+                .ToListAsync(ct))
+            .Select(UrlNormalizer.TitleKey).ToHashSet();
 
         var created = new List<RawItem>();
         foreach (var item in items)
         {
-            if (!seen.Add(item.ExternalId)) continue;
+            var externalId = UrlNormalizer.Normalize(item.ExternalId);
+            if (seen.Contains(item.ExternalId) || !seen.Add(externalId)) continue;
+            var titleKey = UrlNormalizer.TitleKey(item.Title);
+            var duplicate = titleKey.Length >= MinTitleKeyLength && !recentTitles.Add(titleKey);
             var raw = new RawItem
             {
                 SourceId = sourceId,
-                ExternalId = item.ExternalId,
+                ExternalId = externalId,
                 Url = item.Url,
                 Title = item.Title,
                 Text = item.Text,
                 PublishedAt = item.PublishedAt,
                 CollectedAt = now,
                 ImageUrls = item.ImageUrls.ToList(),
-                Status = item.PublishedAt is { } p && p < now - MaxAge ? RawItemStatus.SkippedOld : RawItemStatus.New,
+                Status = item.PublishedAt is { } p && p < now - MaxAge ? RawItemStatus.SkippedOld
+                    : duplicate ? RawItemStatus.Duplicate
+                    : RawItemStatus.New,
             };
             created.Add(raw);
             db.RawItems.Add(raw);

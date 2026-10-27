@@ -2,7 +2,7 @@ namespace NewsFactory.Domain;
 
 public enum SourceType { Rss, Html, Vk }
 
-public enum RawItemStatus { New, SkippedOld, Irrelevant, Relevant, Clustered, Failed }
+public enum RawItemStatus { New, SkippedOld, Irrelevant, Relevant, Clustered, Failed, Duplicate }
 
 public enum StoryStatus
 {
