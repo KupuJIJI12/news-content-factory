@@ -1,15 +1,9 @@
 import { ApiError, apiFetch } from './client'
 import type {
-  ChannelSettings, CitySettings, LlmProvider, LlmProviderInput, LlmTask, LlmTaskSetting, PromptTask, PromptVersion, Secrets, Usage,
+  LlmProvider, LlmProviderInput, LlmTask, LlmTaskSetting, PromptTask, PromptVersion, Secrets, Usage,
 } from './types'
 
 const S = '/api/settings'
-export const getCity = () => apiFetch<CitySettings>(`${S}/city`)
-export const putCity = (input: { name: string; keywords: string[]; scoreThreshold: number }) =>
-  apiFetch<CitySettings>(`${S}/city`, { method: 'PUT', json: input })
-export const getChannels = () => apiFetch<ChannelSettings[]>(`${S}/channels`)
-export const putChannel = (id: number, input: { name: string; externalChatId: string; dailyLimit: number; isEnabled: boolean }) =>
-  apiFetch<ChannelSettings>(`${S}/channels/${id}`, { method: 'PUT', json: input })
 export const getSecrets = () => apiFetch<Secrets>(`${S}/secrets`)
 export const getProviders = () => apiFetch<LlmProvider[]>(`${S}/llm/providers`)
 export const createProvider = (input: LlmProviderInput) => apiFetch<LlmProvider>(`${S}/llm/providers`, { method: 'POST', json: input })

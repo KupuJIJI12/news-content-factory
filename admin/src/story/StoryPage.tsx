@@ -14,6 +14,7 @@ import { MaxPostPreview } from './MaxPostPreview'
 import { PublishPanel } from './PublishPanel'
 import { SourcesColumn } from './SourcesColumn'
 import { useDraftAutosave } from './useDraftAutosave'
+import { useCities } from '../lib/useCities'
 import { notifyError, useStoryRefresh } from './useStoryActions'
 
 const STATUS_LABEL: Record<string, string> = {
@@ -28,7 +29,7 @@ const same = (a: DraftInput, b: DraftInput) =>
 
 export function StoryPage() {
   const id = Number(useParams().id)
-  const tz = useCityTimeZone()
+  const defaultTz = useCityTimeZone()
   const mobile = useMediaQuery('(max-width: 48em)')
   const { data: story, isLoading, error } = useQuery({
     queryKey: storyKey(id),
@@ -36,6 +37,8 @@ export function StoryPage() {
     refetchInterval: (q) => (q.state.data?.status === 'Processing' || q.state.data?.status === 'New' ? 5_000 : 30_000),
   })
   const { data: counters } = useQuery({ queryKey: countersKey, queryFn: getCounters })
+  const tz = story?.timeZone ?? defaultTz
+  const { multi } = useCities()
   const refresh = useStoryRefresh(id)
 
   const [baseline, setBaseline] = useState<DraftInput>(toInput(null))
@@ -74,13 +77,14 @@ export function StoryPage() {
   const selectedImage = story?.images.find((i) => i.id === selectedImageId) ?? null
   const [debounced] = useDebouncedValue(value, 400)
   const { data: previews } = useQuery({
-    queryKey: ['preview', debounced, selectedImage?.credit ?? null],
-    queryFn: () => preview({ ...debounced, imageCredit: selectedImage?.credit ?? null }),
+    queryKey: ['preview', debounced, selectedImage?.credit ?? null, story?.cityId],
+    queryFn: () => preview({ ...debounced, imageCredit: selectedImage?.credit ?? null, cityId: story?.cityId }),
     enabled: !!story && (debounced.title !== '' || debounced.body !== ''),
     placeholderData: (prev) => prev,
   })
   const maxPreview = previews?.find((p) => p.platform === 'Max') ?? previews?.[0]
-  const today = useMemo(() => counters?.today[0], [counters])
+  const today = useMemo(() => counters?.today.find((t) => t.cityName === story?.cityName)
+    ?? (counters?.today.length === 1 ? counters.today[0] : undefined), [counters, story])
 
   if (isLoading) return <Center h={200}><Loader /></Center>
   if (error || !story) return <Alert color="red">Сюжет не найден. <Anchor component={Link} to="/">К очереди</Anchor></Alert>
@@ -122,6 +126,7 @@ export function StoryPage() {
     <Stack gap="sm" pb={mobile ? 0 : 'md'}>
       <Group gap="xs" wrap="wrap">
         <Anchor component={Link} to="/" size="sm">← Очередь</Anchor>
+        {multi && <Badge variant="outline" color="gray">{story.cityName}</Badge>}
         <Badge variant="light">{STATUS_LABEL[story.status] ?? story.status}</Badge>
         <ScoreBadge score={story.score} />
         {story.scoreReason && <Text size="xs" c="dimmed">{story.scoreReason}</Text>}

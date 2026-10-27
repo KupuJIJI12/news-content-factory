@@ -4,14 +4,16 @@ import userEvent from '@testing-library/user-event'
 import { renderWithProviders } from '../test/render'
 import type { StoryListItem, StoryListPage } from '../api/types'
 import * as stories from '../api/stories'
+import * as cities from '../api/cities'
 import { QueuePage } from './QueuePage'
 
 vi.mock('../api/stories', async (o) => ({ ...(await o<typeof stories>()), listStories: vi.fn(), storyCounts: vi.fn() }))
 vi.mock('../api/auth', () => ({ useMe: () => ({ data: { id: 1, login: 'admin', timeZone: 'Europe/Samara' } }) }))
+vi.mock('../api/cities', async (o) => ({ ...(await o<typeof cities>()), listCities: vi.fn() }))
 
 const item = (over: Partial<StoryListItem> = {}): StoryListItem => ({
   id: 1, status: 'ReadyForReview', score: 9, title: 'Без воды 15 ноября', sourcesCount: 2, hasUpdates: false,
-  updatedAt: '2026-10-26T10:00:00Z', scheduledAt: null, ...over,
+  updatedAt: '2026-10-26T10:00:00Z', scheduledAt: null, cityId: 1, cityName: 'Отрадный', timeZone: 'Europe/Samara', ...over,
 })
 
 function respond(page: StoryListPage) {
@@ -21,6 +23,9 @@ function respond(page: StoryListPage) {
 describe('QueuePage', () => {
   beforeEach(() => {
     vi.mocked(stories.listStories).mockReset()
+    vi.mocked(cities.listCities).mockImplementation(async () => [
+      { id: 1, name: 'Отрадный', slug: 'otradny', timeZone: 'Europe/Samara', keywords: [], scoreThreshold: 6, sourcesCount: 1, channel: null },
+    ])
     vi.mocked(stories.storyCounts).mockImplementation(async () =>
       ({ Review: 3, LowInterest: 12, Scheduled: 1, Published: 40, Rejected: 0, Errors: 2 }))
   })
@@ -60,5 +65,19 @@ describe('QueuePage', () => {
     expect(await screen.findByRole('tab', { name: /Низкий интерес\s*12/ })).toBeInTheDocument()
     expect(screen.getByRole('tab', { name: /Запланировано\s*1/ })).toBeInTheDocument()
     expect(screen.getByRole('tab', { name: /Ошибки\s*2/ })).toBeInTheDocument()
+  })
+
+  it('filters by city', async () => {
+    vi.mocked(cities.listCities).mockImplementation(async () => [
+      { id: 1, name: 'Отрадный', slug: 'otradny', timeZone: 'Europe/Samara', keywords: [], scoreThreshold: 6, sourcesCount: 1, channel: null },
+      { id: 2, name: 'Кинель', slug: 'kinel', timeZone: 'Europe/Samara', keywords: [], scoreThreshold: 6, sourcesCount: 1, channel: null },
+    ])
+    respond({ items: [item()], total: 1 })
+    renderWithProviders(<QueuePage />)
+    await userEvent.click(await screen.findByRole('textbox', { name: 'Город' }))
+    await userEvent.click(await screen.findByRole('option', { name: 'Кинель' }))
+    await waitFor(() => expect(stories.listStories).toHaveBeenCalledWith('Review', 0, 50, 2))
+    await waitFor(() => expect(stories.storyCounts).toHaveBeenCalledWith(2))
+    expect(screen.getAllByText('Отрадный').length).toBeGreaterThan(0) // city badge in the row
   })
 })

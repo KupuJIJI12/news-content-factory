@@ -1,3 +1,5 @@
+import { CityFilter } from '../lib/CityFilter'
+import { useCities } from '../lib/useCities'
 import { useState } from 'react'
 import { useQuery } from '@tanstack/react-query'
 import { useMediaQuery } from '@mantine/hooks'
@@ -20,14 +22,22 @@ function Health({ s }: { s: SourceDto }) {
 export function SourcesPage() {
   const tz = useCityTimeZone()
   const mobile = useMediaQuery('(max-width: 48em)')
-  const { data, isLoading, error } = useQuery({ queryKey: sourcesKey, queryFn: listSources })
+  const [cityId, setCityId] = useState<number | null>(null)
+  const { multi } = useCities()
+  const { data, isLoading, error } = useQuery({ queryKey: [...sourcesKey, cityId], queryFn: () => listSources(cityId) })
+  const cityBadges = (s: SourceDto) => multi && s.cities.map((c) => (
+    <Badge key={c.cityId} size="xs" variant="outline" color="gray">{c.cityName}</Badge>
+  ))
   const [editing, setEditing] = useState<SourceDto | null | 'new'>(null)
   const when = (iso: string | null) => (iso ? formatInCity(iso, tz) : '—')
 
   return (
     <Stack gap="sm">
       <Group justify="space-between">
-        <Title order={3}>Источники</Title>
+        <Group align="flex-end" gap="md">
+          <Title order={3}>Источники</Title>
+          <CityFilter value={cityId} onChange={setCityId} />
+        </Group>
         <Button onClick={() => setEditing('new')}>Добавить</Button>
       </Group>
       {isLoading && <Center h={120}><Loader /></Center>}
@@ -39,7 +49,7 @@ export function SourcesPage() {
             <Paper key={s.id} withBorder p="sm" onClick={() => setEditing(s)} style={{ cursor: 'pointer' }}>
               <Group justify="space-between" wrap="nowrap">
                 <Text fw={600}>{s.name}</Text>
-                <Badge variant="outline">{TYPE_LABEL[s.type]}</Badge>
+                <Group gap={4} wrap="nowrap">{cityBadges(s)}<Badge variant="outline">{TYPE_LABEL[s.type]}</Badge></Group>
               </Group>
               <Group gap="xs" mt={4}><Health s={s} /><Text size="xs" c="dimmed">{`запуск ${when(s.lastRunAt)}`}</Text></Group>
               {s.lastError && <Text size="xs" c="red" lineClamp={2} mt={4}>{s.lastError}</Text>}
@@ -57,7 +67,7 @@ export function SourcesPage() {
           <Table.Tbody>
             {data.map((s) => (
               <Table.Tr key={s.id} onClick={() => setEditing(s)} style={{ cursor: 'pointer' }}>
-                <Table.Td>{s.name}</Table.Td>
+                <Table.Td><Group gap={6}>{s.name}{cityBadges(s)}</Group></Table.Td>
                 <Table.Td>{TYPE_LABEL[s.type]}</Table.Td>
                 <Table.Td><Health s={s} /></Table.Td>
                 <Table.Td>{when(s.lastRunAt)}</Table.Td>

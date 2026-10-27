@@ -8,7 +8,7 @@ import { theme } from '../theme'
 export function renderWithProviders(ui: ReactElement, { route = '/' }: { route?: string } = {}) {
   const client = new QueryClient({ defaultOptions: { queries: { retry: false }, mutations: { retry: false } } })
   const Wrapper = ({ children }: { children: ReactNode }) => (
-    <MantineProvider theme={theme}>
+    <MantineProvider theme={theme} env="test">
       <QueryClientProvider client={client}>
         <MemoryRouter initialEntries={[route]}>{children}</MemoryRouter>
       </QueryClientProvider>

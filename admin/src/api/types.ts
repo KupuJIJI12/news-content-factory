@@ -14,7 +14,7 @@ export type FactCheckIssueSource = 'Deterministic' | 'Llm'
 
 export interface Me { id: number; login: string; timeZone: string }
 
-export interface ChannelToday { channelId: number; name: string; published: number; scheduled: number; limit: number }
+export interface ChannelToday { channelId: number; name: string; published: number; scheduled: number; limit: number; cityName?: string }
 export interface ErrorBreakdown {
   sourcesFailing: number; sourcesSilent: number; storiesProcessingFailed: number; storiesPublishFailed: number
   rawItemsFailed24h: number; budgetExceeded: boolean; total: number
@@ -23,7 +23,7 @@ export interface Counters { onReview: number; withUpdates: number; errors: Error
 
 export interface StoryListItem {
   id: number; status: StoryStatus; score: number | null; title: string; sourcesCount: number; hasUpdates: boolean
-  updatedAt: string; scheduledAt: string | null
+  updatedAt: string; scheduledAt: string | null; cityId: number; cityName: string; timeZone: string
 }
 export interface StoryListPage { items: StoryListItem[]; total: number }
 
@@ -44,7 +44,7 @@ export interface PublicationDto {
 export interface StoryDetail {
   id: number; status: StoryStatus; score: number | null; scoreReason: string | null; summary: string; hasUpdates: boolean
   lastError: string | null; sources: StorySourceDto[]; currentDraft: DraftDto | null; versions: DraftDto[]
-  images: StoryImageDto[]; publications: PublicationDto[]
+  images: StoryImageDto[]; publications: PublicationDto[]; cityId: number; cityName: string; timeZone: string
 }
 
 export interface DraftInput { title: string; body: string; hashtags: string[] }
@@ -59,14 +59,17 @@ export interface PreviewResult {
 export interface SourceDto {
   id: number; name: string; type: SourceType; url: string; config: string | null; pollIntervalMinutes: number
   expectedFrequencyHours: number | null; photosAllowedWithCredit: boolean; photoCredit: string | null; isEnabled: boolean
-  isDedicated: boolean; lastRunAt: string | null; lastSuccessAt: string | null; lastItemAt: string | null
+  cities: SourceCity[]; lastRunAt: string | null; lastSuccessAt: string | null; lastItemAt: string | null
   consecutiveFailures: number; lastError: string | null; health: SourceHealthStatus
 }
 export interface SourceInput {
   name: string; type: SourceType; url: string; config: string | null; pollIntervalMinutes: number
   expectedFrequencyHours: number | null; photosAllowedWithCredit: boolean; photoCredit: string | null; isEnabled: boolean
-  isDedicated: boolean
+  cities: SourceCityInput[]
 }
+/** isDedicated: every item of the source is about that city, so the keyword check is skipped for it. */
+export interface SourceCity { cityId: number; cityName: string; isDedicated: boolean }
+export interface SourceCityInput { cityId: number; isDedicated: boolean }
 export interface SourceTestItem { title: string; url: string; publishedAt: string | null; textPreview: string; imageCount: number }
 export interface SourceTestResult { ok: boolean; error: string | null; items: SourceTestItem[] }
 export interface HtmlSourceConfig {
@@ -74,8 +77,15 @@ export interface HtmlSourceConfig {
   dateFormat?: string | null; bodySelector?: string | null; imageSelector?: string | null
 }
 
-export interface CitySettings { name: string; keywords: string[]; scoreThreshold: number; timeZone: string }
-export interface ChannelSettings { id: number; name: string; platform: Platform; externalChatId: string; dailyLimit: number; isEnabled: boolean }
+export interface ChannelSettings {
+  id: number; name: string; platform: Platform; externalChatId: string; dailyLimit: number; isEnabled: boolean; cityId: number; cityName: string
+}
+export interface ChannelInput { name: string; externalChatId: string; dailyLimit: number; isEnabled: boolean }
+export interface City {
+  id: number; name: string; slug: string; timeZone: string; keywords: string[]; scoreThreshold: number
+  channel: ChannelSettings | null; sourcesCount: number
+}
+export interface CityInput { name: string; timeZone: string; keywords: string[]; scoreThreshold: number }
 export interface Secrets { maxBotToken: boolean; vkServiceToken: boolean; gigachatAuthKey: boolean; yandexApiKey: boolean }
 export interface LlmProvider {
   id: number; name: string; kind: LlmProviderKind; baseUrl: string; apiKeyEnvVar: string; models: string[]

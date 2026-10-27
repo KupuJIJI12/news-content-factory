@@ -7,7 +7,8 @@ import { listStories, PAGE_SIZE, storiesKey, storyCounts, storyCountsKey } from 
 import type { QueueTab, StoryListItem } from '../api/types'
 import { formatInCity } from '../lib/cityTime'
 import { plural } from '../lib/format'
-import { useCityTimeZone } from '../lib/useCityTimeZone'
+import { CityFilter } from '../lib/CityFilter'
+import { useCities } from '../lib/useCities'
 import { ScoreBadge } from './ScoreBadge'
 
 const TABS: { value: QueueTab; label: string }[] = [
@@ -25,19 +26,21 @@ export function QueuePage() {
   const [params, setParams] = useSearchParams()
   const tab: QueueTab = isTab(params.get('tab')) ? (params.get('tab') as QueueTab) : 'Review'
   const page = Math.max(1, Number(params.get('page') ?? 1) || 1)
+  const cityId = Number(params.get('city')) || null
+  const { multi } = useCities()
   const isMobile = useMediaQuery('(max-width: 48em)') ?? false
-  const tz = useCityTimeZone()
   const navigate = useNavigate()
   const query = useQuery({
-    queryKey: storiesKey(tab, page),
-    queryFn: () => listStories(tab, (page - 1) * PAGE_SIZE, PAGE_SIZE),
+    queryKey: storiesKey(tab, page, cityId),
+    queryFn: () => (cityId ? listStories(tab, (page - 1) * PAGE_SIZE, PAGE_SIZE, cityId) : listStories(tab, (page - 1) * PAGE_SIZE, PAGE_SIZE)),
   })
-
-  const counts = useQuery({ queryKey: storyCountsKey(), queryFn: () => storyCounts() })
+  const counts = useQuery({ queryKey: storyCountsKey(cityId), queryFn: () => (cityId ? storyCounts(cityId) : storyCounts()) })
+  const setQuery = (next: Record<string, string>) => setParams({ ...(cityId ? { city: String(cityId) } : {}), ...next })
+  const cityBadge = (s: StoryListItem) => multi && <Badge size="xs" variant="outline" color="gray">{s.cityName}</Badge>
 
   const open = (s: StoryListItem) => navigate(`/stories/${s.id}`)
   const when = (s: StoryListItem) =>
-    formatInCity(tab === 'Scheduled' && s.scheduledAt ? s.scheduledAt : s.updatedAt, tz)
+    formatInCity(tab === 'Scheduled' && s.scheduledAt ? s.scheduledAt : s.updatedAt, s.timeZone)
   const sources = (n: number) => `${n} ${plural(n, 'источник', 'источника', 'источников')}`
   const updates = (s: StoryListItem) => s.hasUpdates && (
     <Tooltip label="Появились новые подробности">
@@ -47,7 +50,8 @@ export function QueuePage() {
 
   return (
     <Stack>
-      <Tabs value={tab} onChange={(v) => setParams(v ? { tab: v } : {})} keepMounted={false}>
+      <CityFilter value={cityId} onChange={(id) => setParams({ ...(id ? { city: String(id) } : {}), tab })} />
+      <Tabs value={tab} onChange={(v) => setQuery(v ? { tab: v } : {})} keepMounted={false}>
         <Tabs.List style={{ overflowX: 'auto', flexWrap: 'nowrap' }}>
           {TABS.map((t) => (
             <Tabs.Tab key={t.value} value={t.value}
@@ -78,6 +82,7 @@ export function QueuePage() {
                 <ScoreBadge score={s.score} />
               </Group>
               <Group gap="xs" mt={4}>
+                {cityBadge(s)}
                 <Text size="xs" c="dimmed">{sources(s.sourcesCount)} · {when(s)}</Text>
                 {updates(s)}
               </Group>
@@ -98,7 +103,7 @@ export function QueuePage() {
             {query.data.items.map((s) => (
               <Table.Tr key={s.id} onClick={() => open(s)} style={{ cursor: 'pointer' }}>
                 <Table.Td><ScoreBadge score={s.score} /></Table.Td>
-                <Table.Td><Group gap="xs" wrap="nowrap"><Text>{s.title}</Text>{updates(s)}</Group></Table.Td>
+                <Table.Td><Group gap="xs" wrap="nowrap"><Text>{s.title}</Text>{cityBadge(s)}{updates(s)}</Group></Table.Td>
                 <Table.Td><Text size="sm" c="dimmed">{sources(s.sourcesCount)}</Text></Table.Td>
                 <Table.Td><Text size="sm">{when(s)}</Text></Table.Td>
               </Table.Tr>
@@ -109,7 +114,7 @@ export function QueuePage() {
 
       {query.data && query.data.total > PAGE_SIZE && (
         <Pagination total={Math.ceil(query.data.total / PAGE_SIZE)} value={page}
-          onChange={(p) => setParams({ tab, page: String(p) })} />
+          onChange={(p) => setQuery({ tab, page: String(p) })} />
       )}
     </Stack>
   )

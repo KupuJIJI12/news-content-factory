@@ -11,5 +11,6 @@ export const story = (over: Partial<StoryDetail> = {}): StoryDetail => ({
   sources: [{ rawItemId: 7, sourceName: 'otradny.org', url: 'https://otradny.org/n/1', title: 'Отключение воды',
     text: '15 ноября на улице Гагарина не будет воды.', publishedAt: '2026-10-26T08:00:00Z',
     images: [{ url: 'https://otradny.org/i/1.jpg', allowed: false }] }],
-  currentDraft: draft(), versions: [draft()], images: [], publications: [], ...over,
+  currentDraft: draft(), versions: [draft()], images: [], publications: [], cityId: 1, cityName: 'Отрадный',
+  timeZone: 'Europe/Samara', ...over,
 })

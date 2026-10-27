@@ -6,9 +6,10 @@ import type { Counters } from '../api/types'
 export const pageTitle = (onReview: number) => (onReview > 0 ? `(${onReview}) NewsFactory` : 'NewsFactory')
 
 function todayText(c: Counters): string | null {
-  const t = c.today[0]
-  if (!t) return null
-  return `Сегодня ${t.published}/${t.limit}` + (t.scheduled > 0 ? ` (+${t.scheduled})` : '')
+  const one = (t: Counters['today'][number]) => `${t.published}/${t.limit}` + (t.scheduled > 0 ? ` (+${t.scheduled})` : '')
+  if (c.today.length === 0) return null
+  if (c.today.length === 1) return `Сегодня ${one(c.today[0])}`
+  return 'Сегодня ' + c.today.map((t) => `${t.cityName || t.name} ${one(t)}`).join(' · ')
 }
 
 export function CountersBar({ counters, compact }: { counters: Counters | undefined; compact: boolean }) {
@@ -20,7 +21,7 @@ export function CountersBar({ counters, compact }: { counters: Counters | undefi
     { label: `Обновления ${counters.withUpdates}`, color: 'grape', to: '/?tab=Review' },
     { label: `Ошибки ${counters.errors.total}`, color: counters.errors.total > 0 ? 'red' : 'gray', to: '/?tab=Errors' },
   ]
-  const full = counters.today[0] && counters.today[0].published + counters.today[0].scheduled >= counters.today[0].limit
+  const full = counters.today.some((t) => t.published + t.scheduled >= t.limit)
 
   if (compact) {
     return (

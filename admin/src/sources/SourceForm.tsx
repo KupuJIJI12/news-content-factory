@@ -1,11 +1,12 @@
-import { useState } from 'react'
-import { Button, Checkbox, Divider, Group, NumberInput, SegmentedControl, Stack, Text, TextInput } from '@mantine/core'
+import { useEffect, useState } from 'react'
+import { Button, Checkbox, Divider, Group, NumberInput, Paper, SegmentedControl, Stack, Switch, Text, TextInput } from '@mantine/core'
 import { useQueryClient } from '@tanstack/react-query'
 import { notifications } from '@mantine/notifications'
 import { ApiError } from '../api/client'
 import { fieldErrors } from '../api/settings'
 import { createSource, sourcesKey, testSource, updateSource } from '../api/sources'
 import type { HtmlSourceConfig, SourceDto, SourceInput, SourceTestResult as Result, SourceType } from '../api/types'
+import { useCities } from '../lib/useCities'
 import { useCityTimeZone } from '../lib/useCityTimeZone'
 import { SourceTestResult } from './SourceTestResult'
 
@@ -48,7 +49,14 @@ export function SourceForm({ source, onSaved }: { source: SourceDto | null; onSa
   const [photosAllowed, setPhotosAllowed] = useState(source?.photosAllowedWithCredit ?? false)
   const [credit, setCredit] = useState(source?.photoCredit ?? '')
   const [enabled, setEnabled] = useState(source?.isEnabled ?? true)
-  const [dedicated, setDedicated] = useState(source?.isDedicated ?? false)
+  const { cities, loaded } = useCities()
+  // cityId → "every item is about this city" for the cities the source is linked to
+  const [links, setLinks] = useState<Record<number, boolean>>(
+    () => Object.fromEntries((source?.cities ?? []).map((c) => [c.cityId, c.isDedicated])))
+  useEffect(() => {
+    // A new source in a single-city setup belongs to that city.
+    if (!source && loaded && cities.length === 1) setLinks((l) => (Object.keys(l).length === 0 ? { [cities[0].id]: false } : l))
+  }, [source, loaded, cities])
   const [html, setHtml] = useState<Partial<HtmlSourceConfig>>(source?.type === 'Html' ? parse<HtmlSourceConfig>(source.config) : {})
   const [screenName, setScreenName] = useState(source?.type === 'Vk' ? (parse<{ screenName: string }>(source.config).screenName ?? '') : '')
   const [errors, setErrors] = useState<Record<string, string>>({})
@@ -58,7 +66,8 @@ export function SourceForm({ source, onSaved }: { source: SourceDto | null; onSa
   const input = (): SourceInput => ({
     name: name.trim(), type, url: url.trim(), config: buildConfig(type, html, screenName), pollIntervalMinutes: poll,
     expectedFrequencyHours: freq === '' ? null : freq, photosAllowedWithCredit: photosAllowed,
-    photoCredit: credit.trim() || null, isEnabled: enabled, isDedicated: dedicated,
+    photoCredit: credit.trim() || null, isEnabled: enabled,
+    cities: cities.filter((c) => c.id in links).map((c) => ({ cityId: c.id, isDedicated: links[c.id] })),
   })
 
   function fail(err: unknown) {
@@ -125,8 +134,30 @@ export function SourceForm({ source, onSaved }: { source: SourceDto | null; onSa
       </Group>
       <Checkbox label="Фото можно брать с подписью" checked={photosAllowed} onChange={(e) => setPhotosAllowed(e.currentTarget.checked)} />
       {photosAllowed && <TextInput label="Подпись к фото" placeholder="Фото: …" value={credit} onChange={(e) => setCredit(e.currentTarget.value)} />}
-      <Checkbox label="Источник только про наш город (без фильтра по ключевым словам)" checked={dedicated}
-        onChange={(e) => setDedicated(e.currentTarget.checked)} />
+      <Paper withBorder p="sm">
+        <Stack gap={6}>
+          <Text size="sm" fw={500}>Города источника</Text>
+          <Text size="xs" c="dimmed">
+            Для сайта или паблика самого города включите «Все новости источника — про город»: каждая его новость пойдёт в работу.
+            Для областных СМИ оставьте выключенным: из их новостей возьмутся только те, где есть ключевые слова города,
+            а LLM подтвердит, что новость про этот город.
+          </Text>
+          {cities.map((c) => (
+            <Group key={c.id} gap="md" wrap="wrap">
+              <Checkbox label={c.name} checked={c.id in links} w={160}
+                onChange={(e) => {
+                  const on = e.currentTarget.checked
+                  setLinks((l) => { const n = { ...l }; if (on) n[c.id] = false; else delete n[c.id]; return n })
+                }} />
+              {c.id in links && (
+                <Switch size="xs" label={`Все новости источника — про ${c.name}`} checked={links[c.id]}
+                  onChange={(e) => { const on = e.currentTarget.checked; setLinks((l) => ({ ...l, [c.id]: on })) }} />
+              )}
+            </Group>
+          ))}
+          {errors.cities && <Text size="xs" c="red">{errors.cities}</Text>}
+        </Stack>
+      </Paper>
       <Checkbox label="Включён" checked={enabled} onChange={(e) => setEnabled(e.currentTarget.checked)} />
 
       <Group justify="flex-end">

@@ -5,11 +5,11 @@ import type {
 } from './types'
 
 export const PAGE_SIZE = 50
-export const storiesKey = (tab: QueueTab, page: number) => ['stories', tab, page] as const
+export const storiesKey = (tab: QueueTab, page: number, cityId?: number | null) => ['stories', tab, page, cityId ?? null] as const
 export const storyKey = (id: number) => ['story', id] as const
 
-export const listStories = (tab: QueueTab, skip: number, take: number) =>
-  apiFetch<StoryListPage>(`/api/stories?tab=${tab}&skip=${skip}&take=${take}`)
+export const listStories = (tab: QueueTab, skip: number, take: number, cityId?: number) =>
+  apiFetch<StoryListPage>(`/api/stories?tab=${tab}&skip=${skip}&take=${take}${cityId ? `&cityId=${cityId}` : ''}`)
 export const storyCountsKey = (cityId?: number | null) => ['stories', 'counts', cityId ?? null] as const
 export const storyCounts = (cityId?: number | null) =>
   apiFetch<Record<QueueTab, number>>(`/api/stories/counts${cityId ? `?cityId=${cityId}` : ''}`)
