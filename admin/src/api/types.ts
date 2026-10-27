@@ -19,7 +19,7 @@ export interface ErrorBreakdown {
   sourcesFailing: number; sourcesSilent: number; storiesProcessingFailed: number; storiesPublishFailed: number
   rawItemsFailed24h: number; budgetExceeded: boolean; total: number
 }
-export interface Counters { onReview: number; withUpdates: number; errors: ErrorBreakdown; today: ChannelToday[] }
+export interface Counters { onReview: number; withUpdates: number; errors: ErrorBreakdown; today: ChannelToday[]; collectionPaused: boolean }
 
 export interface StoryListItem {
   id: number; status: StoryStatus; score: number | null; title: string; sourcesCount: number; hasUpdates: boolean

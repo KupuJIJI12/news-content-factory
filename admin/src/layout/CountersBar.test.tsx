@@ -10,6 +10,7 @@ const counters: Counters = {
   errors: { sourcesFailing: 1, sourcesSilent: 1, storiesProcessingFailed: 0, storiesPublishFailed: 0, rawItemsFailed24h: 0,
     budgetExceeded: false, total: 2 },
   today: [{ channelId: 1, name: 'Max', published: 2, scheduled: 1, limit: 4 }],
+  collectionPaused: false,
 }
 
 describe('CountersBar', () => {
@@ -30,5 +31,10 @@ describe('CountersBar', () => {
   it('page title shows review count only when there is something to review', () => {
     expect(pageTitle(3)).toBe('(3) NewsFactory')
     expect(pageTitle(0)).toBe('NewsFactory')
+  })
+
+  it('shows paused badge', () => {
+    renderWithProviders(<CountersBar counters={{ ...counters, collectionPaused: true }} compact={false} />)
+    expect(screen.getByText('Сбор на паузе')).toBeInTheDocument()
   })
 })

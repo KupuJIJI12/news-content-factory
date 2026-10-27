@@ -5,6 +5,7 @@ import { useQueryClient } from '@tanstack/react-query'
 import { Link, Outlet, useLocation, useNavigate } from 'react-router'
 import { logout } from '../api/auth'
 import { useCounters } from '../realtime/useCounters'
+import { CollectionToggle } from './CollectionToggle'
 import { CountersBar } from './CountersBar'
 
 const links = [
@@ -36,12 +37,14 @@ export function AppShellLayout() {
             <Title order={4}>NewsFactory</Title>
           </Group>
           <Group gap="sm" wrap="nowrap">
+            {!isMobile && counters && <CollectionToggle paused={counters.collectionPaused} />}
             <CountersBar counters={counters} compact={isMobile} />
             <Button variant="subtle" size="xs" onClick={signOut}>Выйти</Button>
           </Group>
         </Group>
       </AppShell.Header>
       <AppShell.Navbar p="xs">
+        {isMobile && counters && <Group p="xs"><CollectionToggle paused={counters.collectionPaused} /></Group>}
         {links.map((l) => (
           <NavLink key={l.to} component={Link} to={l.to} label={l.label} leftSection={<l.icon size={18} />}
             active={l.to === '/' ? location.pathname === '/' || location.pathname.startsWith('/stories') : location.pathname.startsWith(l.to)}

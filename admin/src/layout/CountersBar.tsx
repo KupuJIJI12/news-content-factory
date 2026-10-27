@@ -37,6 +37,7 @@ export function CountersBar({ counters, compact }: { counters: Counters | undefi
             <Menu.Item key={i.label} onClick={() => navigate(i.to)}>{i.label}</Menu.Item>
           ))}
           {today && <Menu.Item disabled>{today}</Menu.Item>}
+          {counters.collectionPaused && <Menu.Item disabled c="orange">Сбор на паузе</Menu.Item>}
         </Menu.Dropdown>
       </Menu>
     )
@@ -44,6 +45,7 @@ export function CountersBar({ counters, compact }: { counters: Counters | undefi
 
   return (
     <Group gap="xs" wrap="nowrap">
+      {counters.collectionPaused && <Badge color="orange" variant="filled" size="lg">Сбор на паузе</Badge>}
       {items.map((i) => (
         <Badge key={i.label} color={i.color} variant="light" size="lg" style={{ cursor: 'pointer' }} onClick={() => navigate(i.to)}>
           {i.label}

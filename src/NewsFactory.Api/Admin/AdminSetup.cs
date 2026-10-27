@@ -1,3 +1,4 @@
+using NewsFactory.Api.Admin.Collection;
 using System.Text.Json.Serialization;
 using System.Threading.RateLimiting;
 using Hangfire;
@@ -67,6 +68,7 @@ public static class AdminSetup
         api.MapImageEndpoints();
         api.MapSourceEndpoints();
         api.MapSettingsEndpoints();
+        api.MapCollectionEndpoints();
         app.MapHub<AdminHub>(AdminHub.Path).RequireAuthorization();
         return app;
     }

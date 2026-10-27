@@ -16,7 +16,7 @@ public sealed record ErrorBreakdown(int SourcesFailing, int SourcesSilent, int S
                         + (BudgetExceeded ? 1 : 0);
 }
 
-public sealed record Counters(int OnReview, int WithUpdates, ErrorBreakdown Errors, IReadOnlyList<ChannelToday> Today);
+public sealed record Counters(int OnReview, int WithUpdates, ErrorBreakdown Errors, IReadOnlyList<ChannelToday> Today, bool CollectionPaused = false);
 
 public sealed class CountersService(NewsFactoryDbContext db, TimeProvider time)
 {
@@ -33,6 +33,7 @@ public sealed class CountersService(NewsFactoryDbContext db, TimeProvider time)
         int Count(StoryStatus s) => statusCounts.FirstOrDefault(x => x.Key == s)?.Count ?? 0;
         var withUpdates = await db.Stories.CountAsync(s => s.HasUpdates && UpdateVisible.Contains(s.Status), ct);
 
+        var paused = await new CollectionPause(db).IsPausedAsync(ct);
         var sources = await db.Sources.Where(s => s.IsEnabled).ToListAsync(ct);
         var health = sources.Select(s => SourceHealth.Evaluate(s, now)).ToList();
         var since = now.AddHours(-24);
@@ -57,11 +58,12 @@ public sealed class CountersService(NewsFactoryDbContext db, TimeProvider time)
             withUpdates,
             new ErrorBreakdown(
                 health.Count(h => h == SourceHealthStatus.Failing),
-                health.Count(h => h == SourceHealthStatus.Silent),
+                paused ? 0 : health.Count(h => h == SourceHealthStatus.Silent), // silence is expected while collection is paused
                 Count(StoryStatus.ProcessingFailed),
                 Count(StoryStatus.PublishFailed),
                 rawFailed,
                 used >= budget),
-            today);
+            today,
+            paused);
     }
 }
