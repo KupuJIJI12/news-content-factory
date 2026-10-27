@@ -6,7 +6,7 @@ import type { StoryListItem, StoryListPage } from '../api/types'
 import * as stories from '../api/stories'
 import { QueuePage } from './QueuePage'
 
-vi.mock('../api/stories', async (o) => ({ ...(await o<typeof stories>()), listStories: vi.fn() }))
+vi.mock('../api/stories', async (o) => ({ ...(await o<typeof stories>()), listStories: vi.fn(), storyCounts: vi.fn() }))
 vi.mock('../api/auth', () => ({ useMe: () => ({ data: { id: 1, login: 'admin', timeZone: 'Europe/Samara' } }) }))
 
 const item = (over: Partial<StoryListItem> = {}): StoryListItem => ({
@@ -21,6 +21,8 @@ function respond(page: StoryListPage) {
 describe('QueuePage', () => {
   beforeEach(() => {
     vi.mocked(stories.listStories).mockReset()
+    vi.mocked(stories.storyCounts).mockImplementation(async () =>
+      ({ Review: 3, LowInterest: 12, Scheduled: 1, Published: 40, Rejected: 0, Errors: 2 }))
   })
 
   it('renders review items with score badge and updates icon', async () => {
@@ -50,5 +52,13 @@ describe('QueuePage', () => {
     respond({ items: [item({ status: 'Scheduled', scheduledAt: '2026-10-26T21:30:00Z' })], total: 1 })
     renderWithProviders(<QueuePage />, { route: '/?tab=Scheduled' })
     expect(await screen.findByText(/27\.10 01:30/)).toBeInTheDocument()
+  })
+
+  it('shows counts on every tab', async () => {
+    respond({ items: [item()], total: 3 })
+    renderWithProviders(<QueuePage />)
+    expect(await screen.findByRole('tab', { name: /Низкий интерес\s*12/ })).toBeInTheDocument()
+    expect(screen.getByRole('tab', { name: /Запланировано\s*1/ })).toBeInTheDocument()
+    expect(screen.getByRole('tab', { name: /Ошибки\s*2/ })).toBeInTheDocument()
   })
 })

@@ -10,6 +10,9 @@ export const storyKey = (id: number) => ['story', id] as const
 
 export const listStories = (tab: QueueTab, skip: number, take: number) =>
   apiFetch<StoryListPage>(`/api/stories?tab=${tab}&skip=${skip}&take=${take}`)
+export const storyCountsKey = (cityId?: number | null) => ['stories', 'counts', cityId ?? null] as const
+export const storyCounts = (cityId?: number | null) =>
+  apiFetch<Record<QueueTab, number>>(`/api/stories/counts${cityId ? `?cityId=${cityId}` : ''}`)
 export const getStory = (id: number) => apiFetch<StoryDetail>(`/api/stories/${id}`)
 export const saveDraft = (id: number, input: DraftInput) =>
   apiFetch<DraftDto>(`/api/stories/${id}/draft`, { method: 'PUT', json: input })

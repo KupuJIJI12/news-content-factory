@@ -10,6 +10,25 @@ namespace NewsFactory.Api.Tests;
 public class StoryQueriesTests(PostgresFixture db)
 {
     [Fact]
+    public async Task Counts_per_tab()
+    {
+        await db.ResetAsync();
+        await using var host = await AdminTestHost.StartAsync(db);
+        await host.WithDbAsync(async d =>
+        {
+            foreach (var status in new[] { StoryStatus.ReadyForReview, StoryStatus.ReadyForReview, StoryStatus.LowInterest,
+                         StoryStatus.Scheduled, StoryStatus.ProcessingFailed, StoryStatus.PublishFailed, StoryStatus.Processing })
+                await Seed.StoryAsync(d, status);
+        });
+        var counts = await host.GetJsonAsync<Dictionary<QueueTab, int>>("/api/stories/counts");
+        Assert.Equal(new Dictionary<QueueTab, int>
+        {
+            [QueueTab.Review] = 2, [QueueTab.LowInterest] = 1, [QueueTab.Scheduled] = 1, [QueueTab.Published] = 0,
+            [QueueTab.Rejected] = 0, [QueueTab.Errors] = 2,
+        }, counts);
+    }
+
+    [Fact]
     public async Task Review_tab_sorted_by_score_and_uses_draft_title()
     {
         await db.ResetAsync();

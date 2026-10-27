@@ -1,9 +1,9 @@
-import { Card, Center, Group, Loader, Pagination, Stack, Table, Tabs, Text, Tooltip } from '@mantine/core'
+import { Badge, Card, Center, Group, Loader, Pagination, Stack, Table, Tabs, Text, Tooltip } from '@mantine/core'
 import { useMediaQuery } from '@mantine/hooks'
 import { IconBell } from '@tabler/icons-react'
 import { useQuery } from '@tanstack/react-query'
 import { useNavigate, useSearchParams } from 'react-router'
-import { listStories, PAGE_SIZE, storiesKey } from '../api/stories'
+import { listStories, PAGE_SIZE, storiesKey, storyCounts, storyCountsKey } from '../api/stories'
 import type { QueueTab, StoryListItem } from '../api/types'
 import { formatInCity } from '../lib/cityTime'
 import { plural } from '../lib/format'
@@ -33,6 +33,8 @@ export function QueuePage() {
     queryFn: () => listStories(tab, (page - 1) * PAGE_SIZE, PAGE_SIZE),
   })
 
+  const counts = useQuery({ queryKey: storyCountsKey(), queryFn: () => storyCounts() })
+
   const open = (s: StoryListItem) => navigate(`/stories/${s.id}`)
   const when = (s: StoryListItem) =>
     formatInCity(tab === 'Scheduled' && s.scheduledAt ? s.scheduledAt : s.updatedAt, tz)
@@ -48,8 +50,14 @@ export function QueuePage() {
       <Tabs value={tab} onChange={(v) => setParams(v ? { tab: v } : {})} keepMounted={false}>
         <Tabs.List style={{ overflowX: 'auto', flexWrap: 'nowrap' }}>
           {TABS.map((t) => (
-            <Tabs.Tab key={t.value} value={t.value}>
-              {t.label}{t.value === tab && query.data ? ` (${query.data.total})` : ''}
+            <Tabs.Tab key={t.value} value={t.value}
+              rightSection={counts.data && (
+                <Badge size="sm" variant={t.value === tab ? 'filled' : 'light'}
+                  color={t.value === 'Errors' && counts.data.Errors > 0 ? 'red' : t.value === 'Review' ? 'blue' : 'gray'}>
+                  {counts.data[t.value]}
+                </Badge>
+              )}>
+              {t.label}
             </Tabs.Tab>
           ))}
         </Tabs.List>

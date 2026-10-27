@@ -20,6 +20,15 @@ public sealed class StoryQueries(NewsFactoryDbContext db)
         _ => throw new ArgumentOutOfRangeException(nameof(tab)),
     };
 
+    /// <summary>Number of stories on every queue tab (optionally for one city).</summary>
+    public async Task<Dictionary<QueueTab, int>> CountsAsync(long? cityId, CancellationToken ct)
+    {
+        var byStatus = await db.Stories.Where(s => cityId == null || s.CityId == cityId)
+            .GroupBy(s => s.Status).Select(g => new { g.Key, Count = g.Count() }).ToListAsync(ct);
+        return Enum.GetValues<QueueTab>().ToDictionary(t => t,
+            t => byStatus.Where(x => StatusesOf(t).Contains(x.Key)).Sum(x => x.Count));
+    }
+
     public async Task<StoryListPage> ListAsync(QueueTab tab, int skip, int take, CancellationToken ct)
     {
         var statuses = StatusesOf(tab);
