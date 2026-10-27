@@ -1,6 +1,6 @@
 import { useState } from 'react'
 import { useQuery, useQueryClient } from '@tanstack/react-query'
-import { Alert, Badge, Button, Code, Group, Paper, SegmentedControl, Spoiler, Stack, Text, Textarea } from '@mantine/core'
+import { Alert, Badge, Button, Code, Group, Paper, SegmentedControl, Spoiler, Stack, Table, Text, Textarea } from '@mantine/core'
 import { notifications } from '@mantine/notifications'
 import { ApiError } from '../api/client'
 import { activatePrompt, createPrompt, fieldErrors, getPrompts } from '../api/settings'
@@ -58,10 +58,23 @@ export function PromptSettings() {
     <Stack gap="sm">
       <SegmentedControl value={current.task} onChange={(v) => { setTask(v as LlmTask); setTextError(null) }}
         data={data.map((p) => ({ value: p.task, label: TASK_LABEL[p.task] ?? p.task }))} />
-      <Text size="sm">
-        Допустимые переменные:{' '}
-        {current.variables.map((v) => <Code key={v} mr={4}>{`{{${v}}}`}</Code>)}
-      </Text>
+      <Text size="sm">{current.description}</Text>
+      <Paper withBorder p="xs">
+        <Text size="xs" c="dimmed" mb={4}>
+          Переменные в фигурных скобках система заменяет данными при каждом обращении к LLM. Обязательные переменные нельзя удалять из текста.
+        </Text>
+        <Table withRowBorders={false} verticalSpacing={2}>
+          <Table.Tbody>
+            {current.variables.map((v) => (
+              <Table.Tr key={v.name}>
+                <Table.Td w={120}><Code>{`{{${v.name}}}`}</Code></Table.Td>
+                <Table.Td><Text size="xs">{v.description}</Text></Table.Td>
+                <Table.Td w={110}><Text size="xs" c="dimmed">{v.required ? 'обязательная' : 'необязательная'}</Text></Table.Td>
+              </Table.Tr>
+            ))}
+          </Table.Tbody>
+        </Table>
+      </Paper>
       <Textarea label="Новая версия" autosize minRows={8} maxRows={24} value={text} error={textError}
         onChange={(e) => { const v = e.currentTarget.value; setDrafts((d) => ({ ...d, [current.task]: v })) }} />
       <Group justify="flex-end">

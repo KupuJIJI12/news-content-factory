@@ -85,5 +85,6 @@ export interface LlmProvider {
 export type LlmProviderInput = Omit<LlmProvider, 'id' | 'apiKeyConfigured'>
 export interface LlmTaskSetting { task: LlmTask; providerId: number; providerName: string; model: string; temperature: number }
 export interface PromptVersion { id: number; version: number; isActive: boolean; createdAt: string; text: string }
-export interface PromptTask { task: LlmTask; variables: string[]; versions: PromptVersion[] }
+export interface PromptVariable { name: string; description: string; required: boolean }
+export interface PromptTask { task: LlmTask; description: string; variables: PromptVariable[]; versions: PromptVersion[] }
 export interface Usage { today: number; month: number; dailyBudget: number }

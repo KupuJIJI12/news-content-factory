@@ -12,7 +12,11 @@ vi.mock('../api/settings', async (o) => ({ ...(await o<typeof api>()), getPrompt
 vi.mock('../api/auth', () => ({ useMe: () => ({ data: { id: 1, login: 'admin', timeZone: 'Europe/Samara' } }) }))
 
 const prompts: PromptTask[] = [{
-  task: 'Rewrite', variables: ['city', 'sources'],
+  task: 'Rewrite', description: 'Пишет пост по источникам сюжета',
+  variables: [
+    { name: 'city', description: 'Название города', required: true },
+    { name: 'sources', description: 'Тексты всех источников сюжета', required: true },
+  ],
   versions: [
     { id: 2, version: 2, isActive: true, createdAt: '2026-10-25T10:00:00Z', text: 'Перепиши для {{city}}: {{sources}}' },
     { id: 1, version: 1, isActive: false, createdAt: '2026-10-20T10:00:00Z', text: 'Старый промпт {{sources}}' },
@@ -52,5 +56,11 @@ describe('PromptSettings', () => {
     fireEvent.change(await screen.findByLabelText(/Новая версия/), { target: { value: 'Новый {{city}}' } })
     await userEvent.click(screen.getByRole('button', { name: 'Сохранить как новую версию' }))
     await waitFor(() => expect(show).toHaveBeenCalledWith(expect.objectContaining({ message: 'Новая версия сохранена и уже используется' })))
+  })
+
+  it('explains variables', async () => {
+    renderWithProviders(<PromptSettings />)
+    expect(await screen.findByText('Тексты всех источников сюжета')).toBeInTheDocument()
+    expect(screen.getByText('Пишет пост по источникам сюжета')).toBeInTheDocument()
   })
 })

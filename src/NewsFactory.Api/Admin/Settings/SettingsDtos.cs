@@ -24,7 +24,9 @@ public sealed record LlmTaskInput(long ProviderId, string? Model, double Tempera
 
 public sealed record PromptVersionDto(long Id, int Version, bool IsActive, DateTimeOffset CreatedAt, string Text);
 
-public sealed record PromptTaskDto(LlmTask Task, IReadOnlyList<string> Variables, IReadOnlyList<PromptVersionDto> Versions);
+public sealed record PromptVariableDto(string Name, string Description, bool Required);
+
+public sealed record PromptTaskDto(LlmTask Task, string Description, IReadOnlyList<PromptVariableDto> Variables, IReadOnlyList<PromptVersionDto> Versions);
 
 public sealed record PromptInput(string? Text);
 

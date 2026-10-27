@@ -105,7 +105,8 @@ public static class SettingsEndpoints
         g.MapGet("/prompts", async (NewsFactoryDbContext db, CancellationToken ct) =>
         {
             var all = await db.PromptTemplates.ToListAsync(ct);
-            return Enum.GetValues<LlmTask>().Select(t => new PromptTaskDto(t, PromptVariables.Allowed(t).Order().ToList(),
+            return Enum.GetValues<LlmTask>().Select(t => new PromptTaskDto(t, PromptVariables.DescribeTask(t),
+                PromptVariables.For(t).Select(v => new PromptVariableDto(v.Name, v.Description, v.Required)).ToList(),
                 all.Where(p => p.Task == t).OrderByDescending(p => p.Version)
                     .Select(p => new PromptVersionDto(p.Id, p.Version, p.IsActive, p.CreatedAt, p.Text)).ToList())).ToList();
         });
