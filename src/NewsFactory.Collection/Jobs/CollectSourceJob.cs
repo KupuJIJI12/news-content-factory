@@ -17,9 +17,17 @@ public sealed class CollectSourceJob(
     ILogger<CollectSourceJob> log)
 {
     public static readonly TimeSpan MaxAge = TimeSpan.FromHours(48);
-    /// <summary>The same headline from the same source within this window is the same news under another link.</summary>
+    /// <summary>The same headline and text from the same source within this window is the same news under another link.</summary>
     public static readonly TimeSpan DuplicateWindow = TimeSpan.FromHours(72);
     private const int MinTitleKeyLength = 15;
+    private const int TextKeyLength = 200;
+
+    /// <summary>Same headline and same beginning of the text: one news under another link, not a new post that starts alike.</summary>
+    private static string DuplicateKey(string title, string text)
+    {
+        var textKey = UrlNormalizer.TitleKey(text);
+        return UrlNormalizer.TitleKey(title) + "\n" + (textKey.Length > TextKeyLength ? textKey[..TextKeyLength] : textKey);
+    }
 
     [DisableConcurrentExecution("collect-source:{0}", 600)]
     public async Task RunAsync(long sourceId, CancellationToken ct)
@@ -55,19 +63,19 @@ public sealed class CollectSourceJob(
             .ToListAsync(ct);
         var seen = known.ToHashSet();
         var since = now - DuplicateWindow;
-        var recentTitles = (await db.RawItems
+        var recent = (await db.RawItems
                 .Where(r => r.SourceId == sourceId && r.CollectedAt >= since)
-                .Select(r => r.Title)
+                .Select(r => new { r.Title, r.Text })
                 .ToListAsync(ct))
-            .Select(UrlNormalizer.TitleKey).ToHashSet();
+            .Select(r => DuplicateKey(r.Title, r.Text)).ToHashSet();
 
         var created = new List<RawItem>();
         foreach (var item in items)
         {
             var externalId = UrlNormalizer.Normalize(item.ExternalId);
             if (seen.Contains(item.ExternalId) || !seen.Add(externalId)) continue;
-            var titleKey = UrlNormalizer.TitleKey(item.Title);
-            var duplicate = titleKey.Length >= MinTitleKeyLength && !recentTitles.Add(titleKey);
+            var key = DuplicateKey(item.Title, item.Text);
+            var duplicate = UrlNormalizer.TitleKey(item.Title).Length >= MinTitleKeyLength && !recent.Add(key);
             var raw = new RawItem
             {
                 SourceId = sourceId,

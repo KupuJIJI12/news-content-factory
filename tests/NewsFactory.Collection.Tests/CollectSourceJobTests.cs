@@ -87,6 +87,21 @@ public class CollectSourceJobTests(PostgresFixture db)
     }
 
     [Fact]
+    public async Task Same_title_with_different_text_is_not_duplicate()
+    {
+        // VK posts and municipal notices often start the same way («Уважаемые жители…») but are different news.
+        var id = await SeedSourceAsync();
+        CollectedItem Post(string itemId, string text) =>
+            new(itemId, "https://vk.example/" + itemId, "Уважаемые жители городского округа Отрадный!", text, Now.AddHours(-1), []);
+        await RunAsync(id, new FakeCollector(SourceType.Rss, _ => [Post("p1", "15 ноября отключат холодную воду на Гагарина.")]));
+        await RunAsync(id, new FakeCollector(SourceType.Rss, _ => [Post("p2", "Приглашаем на субботник в парке 20 ноября.")]));
+
+        await using var ctx = db.CreateContext();
+        Assert.All(await ctx.RawItems.ToListAsync(), r => Assert.Equal(RawItemStatus.New, r.Status));
+        Assert.Equal(2, _queue.RawItems.Count);
+    }
+
+    [Fact]
     public async Task Same_title_from_other_source_is_not_duplicate()
     {
         var first = await SeedSourceAsync();
