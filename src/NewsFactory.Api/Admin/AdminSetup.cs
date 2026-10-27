@@ -1,3 +1,4 @@
+using NewsFactory.Api.Admin.Cities;
 using NewsFactory.Api.Admin.Collection;
 using System.Text.Json.Serialization;
 using System.Threading.RateLimiting;
@@ -69,6 +70,7 @@ public static class AdminSetup
         api.MapSourceEndpoints();
         api.MapSettingsEndpoints();
         api.MapCollectionEndpoints();
+        api.MapCityEndpoints();
         app.MapHub<AdminHub>(AdminHub.Path).RequireAuthorization();
         return app;
     }

@@ -6,17 +6,26 @@ using NewsFactory.Domain;
 
 namespace NewsFactory.Api.Admin.Sources;
 
+public sealed record SourceCityDto(long CityId, string CityName, bool IsDedicated);
+
+/// <summary>IsDedicated per city: every item of the source is about that city, the keyword check is skipped for it.</summary>
+public sealed record SourceCityInput(long CityId, bool IsDedicated);
+
 public sealed record SourceDto(long Id, string Name, SourceType Type, string Url, string? Config, int PollIntervalMinutes,
-    int? ExpectedFrequencyHours, bool PhotosAllowedWithCredit, string? PhotoCredit, bool IsEnabled, bool IsDedicated,
+    int? ExpectedFrequencyHours, bool PhotosAllowedWithCredit, string? PhotoCredit, bool IsEnabled, IReadOnlyList<SourceCityDto> Cities,
     DateTimeOffset? LastRunAt, DateTimeOffset? LastSuccessAt, DateTimeOffset? LastItemAt, int ConsecutiveFailures, string? LastError,
     SourceHealthStatus Health);
 
 public sealed record SourceInput(string? Name, SourceType Type, string? Url, string? Config, int PollIntervalMinutes,
-    int? ExpectedFrequencyHours, bool PhotosAllowedWithCredit, string? PhotoCredit, bool IsEnabled, bool IsDedicated)
+    int? ExpectedFrequencyHours, bool PhotosAllowedWithCredit, string? PhotoCredit, bool IsEnabled,
+    IReadOnlyList<SourceCityInput>? Cities = null)
 {
-    public Dictionary<string, string[]> Validate()
+    /// <param name="requireCities">False for a dry-run test of an unsaved source.</param>
+    public Dictionary<string, string[]> Validate(bool requireCities = true)
     {
         var errors = new Dictionary<string, string[]>();
+        if (requireCities && (Cities is null || Cities.Count == 0)) errors["cities"] = ["Выберите хотя бы один город"];
+        else if (Cities is not null && Cities.Select(c => c.CityId).Distinct().Count() != Cities.Count) errors["cities"] = ["Город указан дважды"];
         if (string.IsNullOrWhiteSpace(Name)) errors["name"] = ["Укажите название"];
         if (!Uri.TryCreate(Url, UriKind.Absolute, out var uri) || uri.Scheme is not ("http" or "https"))
             errors["url"] = ["Нужен полный адрес http(s)://…"];

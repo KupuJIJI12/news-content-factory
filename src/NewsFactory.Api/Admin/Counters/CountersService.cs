@@ -7,7 +7,7 @@ using NewsFactory.Llm;
 
 namespace NewsFactory.Api.Admin.Counters;
 
-public sealed record ChannelToday(long ChannelId, string Name, int Published, int Scheduled, int Limit);
+public sealed record ChannelToday(long ChannelId, string Name, int Published, int Scheduled, int Limit, string CityName = "");
 
 public sealed record ErrorBreakdown(int SourcesFailing, int SourcesSilent, int StoriesProcessingFailed, int StoriesPublishFailed,
     int RawItemsFailed24h, bool BudgetExceeded)
@@ -46,11 +46,11 @@ public sealed class CountersService(NewsFactoryDbContext db, TimeProvider time)
         var used = await db.LlmCalls.Where(c => c.CreatedAt >= dayStart).SumAsync(c => (long)c.PromptTokens + c.CompletionTokens, ct);
 
         var today = new List<ChannelToday>();
-        foreach (var channel in await db.Channels.Where(c => c.IsEnabled).OrderBy(c => c.Id).ToListAsync(ct))
+        foreach (var channel in await db.Channels.Include(c => c.City).Where(c => c.IsEnabled).OrderBy(c => c.Id).ToListAsync(ct))
         {
             var pubs = await db.Publications.Where(p => p.ChannelId == channel.Id && p.ScheduledAt >= dayStart.AddDays(-1)).ToListAsync(ct);
-            var check = DailyLimitPolicy.Check(channel.DailyLimit, pubs, now, tz);
-            today.Add(new ChannelToday(channel.Id, channel.Name, check.Published, check.Scheduled, check.Limit));
+            var check = DailyLimitPolicy.Check(channel.DailyLimit, pubs, now, TimeZoneInfo.FindSystemTimeZoneById(channel.City!.TimeZone));
+            today.Add(new ChannelToday(channel.Id, channel.Name, check.Published, check.Scheduled, check.Limit, channel.City!.Name));
         }
 
         return new Counters(

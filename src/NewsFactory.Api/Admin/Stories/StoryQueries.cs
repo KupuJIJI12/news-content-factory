@@ -29,12 +29,12 @@ public sealed class StoryQueries(NewsFactoryDbContext db)
             t => byStatus.Where(x => StatusesOf(t).Contains(x.Key)).Sum(x => x.Count));
     }
 
-    public async Task<StoryListPage> ListAsync(QueueTab tab, int skip, int take, CancellationToken ct)
+    public async Task<StoryListPage> ListAsync(QueueTab tab, int skip, int take, CancellationToken ct, long? cityId = null)
     {
         var statuses = StatusesOf(tab);
-        var query = db.Stories.Where(s => statuses.Contains(s.Status)).Select(s => new
+        var query = db.Stories.Where(s => statuses.Contains(s.Status) && (cityId == null || s.CityId == cityId)).Select(s => new
         {
-            s.Id, s.Status, s.Score, s.Summary, s.HasUpdates, s.UpdatedAt,
+            s.Id, s.Status, s.Score, s.Summary, s.HasUpdates, s.UpdatedAt, s.CityId, CityName = s.City!.Name, s.City.TimeZone,
             DraftTitle = s.Drafts.Where(d => d.IsCurrent).Select(d => d.Title).FirstOrDefault(),
             SourcesCount = s.RawItems.Count,
             ScheduledAt = db.Publications.Where(p => p.StoryId == s.Id && p.Status == PublicationStatus.Scheduled)
@@ -49,12 +49,13 @@ public sealed class StoryQueries(NewsFactoryDbContext db)
         var total = await query.CountAsync(ct);
         var rows = await query.Skip(Math.Max(0, skip)).Take(Math.Clamp(take, 1, MaxTake)).ToListAsync(ct);
         return new StoryListPage(rows.Select(r => new StoryListItem(r.Id, r.Status, r.Score, r.DraftTitle ?? r.Summary,
-            r.SourcesCount, r.HasUpdates, r.UpdatedAt, r.ScheduledAt)).ToList(), total);
+            r.SourcesCount, r.HasUpdates, r.UpdatedAt, r.ScheduledAt, r.CityId, r.CityName, r.TimeZone)).ToList(), total);
     }
 
     public async Task<StoryDetail?> GetAsync(long id, CancellationToken ct)
     {
         var story = await db.Stories
+            .Include(s => s.City)
             .Include(s => s.Drafts)
             .Include(s => s.Images)
             .Include(s => s.RawItems).ThenInclude(r => r.Source)
@@ -74,7 +75,8 @@ public sealed class StoryQueries(NewsFactoryDbContext db)
             versions,
             story.Images.OrderBy(i => i.Id).Select(ToDto).ToList(),
             publications.Select(p => new PublicationDto(p.Id, p.ChannelId, p.Channel!.Name, p.Status, p.ScheduledAt, p.PublishedAt,
-                p.LastError, p.OverrideLimit)).ToList());
+                p.LastError, p.OverrideLimit)).ToList(),
+            story.CityId, story.City!.Name, story.City.TimeZone);
     }
 
     public static DraftDto ToDto(Draft d) => new(d.Id, d.Version, d.Title, d.Body, d.Hashtags, d.AuthorUserId is not null,

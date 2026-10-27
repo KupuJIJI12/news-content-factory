@@ -2,11 +2,8 @@ using NewsFactory.Domain;
 
 namespace NewsFactory.Api.Admin.Settings;
 
-public sealed record CitySettingsDto(string Name, IReadOnlyList<string> Keywords, int ScoreThreshold, string TimeZone);
-
-public sealed record CitySettingsInput(string? Name, IReadOnlyList<string>? Keywords, int ScoreThreshold);
-
-public sealed record ChannelSettingsDto(long Id, string Name, Platform Platform, string ExternalChatId, int DailyLimit, bool IsEnabled);
+public sealed record ChannelSettingsDto(long Id, string Name, Platform Platform, string ExternalChatId, int DailyLimit, bool IsEnabled,
+    long CityId, string CityName);
 
 public sealed record ChannelSettingsInput(string? Name, string? ExternalChatId, int DailyLimit, bool IsEnabled);
 

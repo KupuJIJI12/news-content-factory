@@ -5,7 +5,7 @@ namespace NewsFactory.Api.Admin.Stories;
 public enum QueueTab { Review, LowInterest, Scheduled, Published, Rejected, Errors }
 
 public sealed record StoryListItem(long Id, StoryStatus Status, int? Score, string Title, int SourcesCount, bool HasUpdates,
-    DateTimeOffset UpdatedAt, DateTimeOffset? ScheduledAt);
+    DateTimeOffset UpdatedAt, DateTimeOffset? ScheduledAt, long CityId, string CityName, string TimeZone);
 
 public sealed record StoryListPage(IReadOnlyList<StoryListItem> Items, int Total);
 
@@ -24,4 +24,4 @@ public sealed record PublicationDto(long Id, long ChannelId, string ChannelName,
 
 public sealed record StoryDetail(long Id, StoryStatus Status, int? Score, string? ScoreReason, string Summary, bool HasUpdates,
     string? LastError, IReadOnlyList<StorySourceDto> Sources, DraftDto? CurrentDraft, IReadOnlyList<DraftDto> Versions,
-    IReadOnlyList<StoryImageDto> Images, IReadOnlyList<PublicationDto> Publications);
+    IReadOnlyList<StoryImageDto> Images, IReadOnlyList<PublicationDto> Publications, long CityId, string CityName, string TimeZone);

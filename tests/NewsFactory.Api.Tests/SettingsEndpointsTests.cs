@@ -19,25 +19,6 @@ public class SettingsEndpointsTests(PostgresFixture db)
     }
 
     [Fact]
-    public async Task City_update_changes_keywords_and_threshold()
-    {
-        await using var host = await StartAsync();
-        var resp = await host.PutJsonAsync("/api/settings/city", new { name = "Отрадный", keywords = new[] { "отрадн", "новоотрадн" }, scoreThreshold = 7 });
-        Assert.Equal(HttpStatusCode.OK, resp.StatusCode);
-        var city = await host.GetJsonAsync<CitySettingsDto>("/api/settings/city");
-        Assert.Equal(["отрадн", "новоотрадн"], city.Keywords);
-        Assert.Equal((7, "Europe/Samara"), (city.ScoreThreshold, city.TimeZone));
-    }
-
-    [Fact]
-    public async Task Threshold_out_of_range_is_400()
-    {
-        await using var host = await StartAsync();
-        Assert.Equal(HttpStatusCode.BadRequest,
-            (await host.PutJsonAsync("/api/settings/city", new { name = "Отрадный", keywords = new[] { "отрадн" }, scoreThreshold = 11 })).StatusCode);
-    }
-
-    [Fact]
     public async Task Channel_update_changes_limit_and_chat_id()
     {
         await using var host = await StartAsync();

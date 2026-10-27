@@ -15,44 +15,16 @@ public static class SettingsEndpoints
     {
         var g = api.MapGroup("/settings");
 
-        g.MapGet("/city", async (NewsFactoryDbContext db, CancellationToken ct) =>
-        {
-            var c = await db.Cities.OrderBy(x => x.Id).FirstAsync(ct);
-            return new CitySettingsDto(c.Name, c.Keywords, c.ScoreThreshold, c.TimeZone);
-        });
-        g.MapPut("/city", async (CitySettingsInput input, NewsFactoryDbContext db, CancellationToken ct) =>
-        {
-            var keywords = (input.Keywords ?? []).Select(k => k.Trim().ToLowerInvariant()).Where(k => k.Length > 0).Distinct().ToList();
-            var errors = new Dictionary<string, string[]>();
-            if (string.IsNullOrWhiteSpace(input.Name)) errors["name"] = ["Укажите название города"];
-            if (keywords.Count == 0) errors["keywords"] = ["Нужно хотя бы одно ключевое слово"];
-            if (input.ScoreThreshold is < 1 or > 10) errors["scoreThreshold"] = ["Порог — от 1 до 10"];
-            if (errors.Count > 0) return Problems.Validation("Проверьте настройки города", errors);
-            var c = await db.Cities.OrderBy(x => x.Id).FirstAsync(ct);
-            c.Name = input.Name!.Trim();
-            c.Keywords = keywords;
-            c.ScoreThreshold = input.ScoreThreshold;
-            await db.SaveChangesAsync(ct);
-            return Results.Ok(new CitySettingsDto(c.Name, c.Keywords, c.ScoreThreshold, c.TimeZone));
-        });
-
         g.MapGet("/channels", async (NewsFactoryDbContext db, CancellationToken ct) =>
-            (await db.Channels.OrderBy(c => c.Id).ToListAsync(ct)).Select(ToDto).ToList());
+            (await db.Channels.Include(c => c.City).OrderBy(c => c.Id).ToListAsync(ct)).Select(c => ChannelRules.ToDto(c, c.City!)).ToList());
         g.MapPut("/channels/{id:long}", async (long id, ChannelSettingsInput input, NewsFactoryDbContext db, CancellationToken ct) =>
         {
-            var c = await db.Channels.SingleOrDefaultAsync(x => x.Id == id, ct);
+            var c = await db.Channels.Include(x => x.City).SingleOrDefaultAsync(x => x.Id == id, ct);
             if (c is null) return Problems.NotFound("Канал");
-            var errors = new Dictionary<string, string[]>();
-            if (string.IsNullOrWhiteSpace(input.Name)) errors["name"] = ["Укажите название канала"];
-            if (input.DailyLimit is < 1 or > 20) errors["dailyLimit"] = ["Лимит — от 1 до 20 постов в день"];
-            if (input.IsEnabled && string.IsNullOrWhiteSpace(input.ExternalChatId)) errors["externalChatId"] = ["Для включённого канала нужен ID чата"];
-            if (errors.Count > 0) return Problems.Validation("Проверьте настройки канала", errors);
-            c.Name = input.Name!.Trim();
-            c.ExternalChatId = input.ExternalChatId?.Trim() ?? "";
-            c.DailyLimit = input.DailyLimit;
-            c.IsEnabled = input.IsEnabled;
+            if (ChannelRules.Validate(input, nameRequired: true) is { Count: > 0 } errors) return Problems.Validation("Проверьте настройки канала", errors);
+            ChannelRules.Apply(c, input, defaultName: c.Name);
             await db.SaveChangesAsync(ct);
-            return Results.Ok(ToDto(c));
+            return Results.Ok(ChannelRules.ToDto(c, c.City!));
         });
 
         g.MapGet("/secrets", (IConfiguration config) => new SecretsDto(
@@ -157,8 +129,6 @@ public static class SettingsEndpoints
     }
 
     private static bool Has(IConfiguration config, string key) => !string.IsNullOrWhiteSpace(config[key]);
-
-    private static ChannelSettingsDto ToDto(Channel c) => new(c.Id, c.Name, c.Platform, c.ExternalChatId, c.DailyLimit, c.IsEnabled);
 
     private static LlmProviderDto ToDto(LlmProvider p, IConfiguration config) => new(p.Id, p.Name, p.Kind, p.BaseUrl, p.ApiKeyEnvVar, p.Models,
         p.Headers, p.SupportsJsonSchema, p.AuthUrl, p.AuthScope, Has(config, p.ApiKeyEnvVar));

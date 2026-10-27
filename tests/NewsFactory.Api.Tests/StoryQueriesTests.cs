@@ -1,3 +1,4 @@
+using Microsoft.EntityFrameworkCore;
 using System.Net;
 using NewsFactory.Api.Admin.Stories;
 using NewsFactory.Domain;
@@ -26,6 +27,31 @@ public class StoryQueriesTests(PostgresFixture db)
             [QueueTab.Review] = 2, [QueueTab.LowInterest] = 1, [QueueTab.Scheduled] = 1, [QueueTab.Published] = 0,
             [QueueTab.Rejected] = 0, [QueueTab.Errors] = 2,
         }, counts);
+    }
+
+    [Fact]
+    public async Task List_and_counts_filter_by_city()
+    {
+        await db.ResetAsync();
+        await using var host = await AdminTestHost.StartAsync(db);
+        var (otradny, other) = await host.WithDbAsync(async d =>
+        {
+            await Seed.StoryAsync(d, StoryStatus.ReadyForReview, draftTitle: "Отрадный");
+            var city = new City { Name = "Кинель", Slug = "kinel", Keywords = ["кинел"] };
+            d.Add(city);
+            await d.SaveChangesAsync();
+            d.Add(TestData.Story(city, StoryStatus.ReadyForReview, "Кинель"));
+            await d.SaveChangesAsync();
+            return (await d.Cities.Where(c => c.Slug != "kinel").Select(c => c.Id).SingleAsync(), city.Id);
+        });
+
+        var page = await host.GetJsonAsync<StoryListPage>($"/api/stories?tab=Review&cityId={other}");
+        Assert.Equal([("Кинель", "Кинель")], page.Items.Select(i => (i.Title, i.CityName)));
+        Assert.Equal(2, (await host.GetJsonAsync<StoryListPage>("/api/stories?tab=Review")).Total);
+        Assert.Equal(1, (await host.GetJsonAsync<Dictionary<QueueTab, int>>($"/api/stories/counts?cityId={otradny}"))[QueueTab.Review]);
+
+        var detail = await host.GetJsonAsync<StoryDetail>($"/api/stories/{page.Items.Single().Id}");
+        Assert.Equal((other, "Кинель", "Europe/Samara"), (detail.CityId, detail.CityName, detail.TimeZone));
     }
 
     [Fact]
