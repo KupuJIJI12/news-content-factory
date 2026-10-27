@@ -22,6 +22,7 @@ public sealed class ProcessStoryJob(NewsFactoryDbContext db, ILlmService llm, IP
 
         var previous = story.Status;
         if (story.Status != StoryStatus.Processing) story.TransitionTo(StoryStatus.Processing);
+        story.LastError = null; // a new failure writes it again; a successful run must not keep the old one
         await db.SaveChangesAsync(ct);
 
         try

@@ -184,6 +184,17 @@ public class ProcessStoryJobTests(PostgresFixture db)
     }
 
     [Fact]
+    public async Task Retry_ending_in_low_interest_clears_last_error()
+    {
+        var id = await SeedAsync(StoryStatus.ProcessingFailed, s => s.LastError = "LLM (Scoring) дважды вернула невалидный ответ");
+        Score(2);
+        await RunAsync(id);
+        await using var ctx = db.CreateContext();
+        var story = await ctx.Stories.SingleAsync();
+        Assert.Equal((StoryStatus.LowInterest, (string?)null), (story.Status, story.LastError));
+    }
+
+    [Fact]
     public async Task Published_story_is_not_touched()
     {
         var id = await SeedAsync(StoryStatus.Published);
