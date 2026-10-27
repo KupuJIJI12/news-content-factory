@@ -216,4 +216,19 @@ public class StoryActionsTests(PostgresFixture db)
         Assert.Equal(HttpStatusCode.NoContent, (await host.PostJsonAsync($"/api/stories/{id}/cancel")).StatusCode);
         Assert.Equal(StoryStatus.ReadyForReview, (await host.WithDbAsync(d => d.Stories.SingleAsync())).Status);
     }
+
+    [Fact]
+    public async Task Publish_without_enabled_channel_is_409_no_channel()
+    {
+        var (host, id) = await StartWithStoryAsync();
+        await using var _ = host;
+        await host.WithDbAsync(async d => { (await d.Channels.SingleAsync()).IsEnabled = false; await d.SaveChangesAsync(); });
+
+        var resp = await host.PostJsonAsync($"/api/stories/{id}/publish", new { overrideLimit = false });
+        Assert.Equal(HttpStatusCode.Conflict, resp.StatusCode);
+        var problem = await ProblemAsync(resp);
+        Assert.Equal("no_channel", problem.GetProperty("code").GetString());
+        Assert.Contains("Отрадный", problem.GetProperty("title").GetString());
+        Assert.Equal(StoryStatus.ReadyForReview, (await host.WithDbAsync(d => d.Stories.SingleAsync())).Status);
+    }
 }

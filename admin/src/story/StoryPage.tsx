@@ -105,6 +105,12 @@ export function StoryPage() {
   )
   const previewCol = (
     <Stack gap="md">
+      {maxPreview && !maxPreview.channelConfigured && (
+        <Alert color="orange" p="xs">
+          <Text size="sm">Канал Max не настроен или выключен — публикация не сработает.</Text>
+          <Anchor component={Link} to="/settings" size="sm">Настроить канал</Anchor>
+        </Alert>
+      )}
       {maxPreview
         ? <MaxPostPreview text={maxPreview.text} imageUrl={selectedImage?.url} tooLong={maxPreview.tooLong} length={maxPreview.length} max={maxPreview.max} />
         : <Text c="dimmed" size="sm">Превью появится, когда будет текст.</Text>}

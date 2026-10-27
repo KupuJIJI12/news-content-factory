@@ -36,6 +36,38 @@ public class SeedDataTests(PostgresFixture db)
     }
 
     [Fact]
+    public async Task Fills_empty_channel_chat_id_from_config_and_enables_it()
+    {
+        await db.ResetAsync();
+        // First start without MAX_CHANNEL_CHAT_ID: the channel is created empty and disabled.
+        await using (var ctx = db.CreateContext()) await SeedData.ApplyAsync(ctx, Config(), default);
+        await using (var ctx = db.CreateContext()) await SeedData.ApplyAsync(ctx, Config(("MAX_CHANNEL_CHAT_ID", "-777")), default);
+
+        await using var read = db.CreateContext();
+        var channel = await read.Channels.SingleAsync();
+        Assert.Equal(("-777", true), (channel.ExternalChatId, channel.IsEnabled));
+    }
+
+    [Fact]
+    public async Task Does_not_overwrite_channel_chat_id_edited_in_ui()
+    {
+        await db.ResetAsync();
+        await using (var ctx = db.CreateContext()) await SeedData.ApplyAsync(ctx, Config(("MAX_CHANNEL_CHAT_ID", "-100")), default);
+        await using (var ctx = db.CreateContext())
+        {
+            var channel = await ctx.Channels.SingleAsync();
+            channel.ExternalChatId = "-200";
+            channel.IsEnabled = false;
+            await ctx.SaveChangesAsync();
+            await SeedData.ApplyAsync(ctx, Config(("MAX_CHANNEL_CHAT_ID", "-100")), default);
+        }
+
+        await using var read = db.CreateContext();
+        var saved = await read.Channels.SingleAsync();
+        Assert.Equal(("-200", false), (saved.ExternalChatId, saved.IsEnabled));
+    }
+
+    [Fact]
     public async Task Sources_match_spec_section_3()
     {
         await db.ResetAsync();

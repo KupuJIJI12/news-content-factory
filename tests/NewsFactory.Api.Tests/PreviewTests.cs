@@ -1,5 +1,6 @@
 using System.Net;
 using System.Net.Http.Json;
+using Microsoft.EntityFrameworkCore;
 using NewsFactory.Api.Admin.Preview;
 using NewsFactory.TestSupport;
 
@@ -27,5 +28,24 @@ public class PreviewTests(PostgresFixture db)
         Assert.True(tooLong.TooLong);
         Assert.True(tooLong.Length > 4000);
         Assert.Contains("Фото: otradny.org", tooLong.Text);
+    }
+
+    [Fact]
+    public async Task Preview_without_enabled_channel_still_renders_max()
+    {
+        await db.ResetAsync();
+        await using var host = await AdminTestHost.StartAsync(db);
+        var cityId = await host.WithDbAsync(async d =>
+        {
+            var channel = await d.Channels.SingleAsync();
+            channel.IsEnabled = false;
+            await d.SaveChangesAsync();
+            return channel.CityId;
+        });
+
+        var resp = await host.PostJsonAsync("/api/preview", new { title = "Заголовок", body = "Текст", hashtags = Array.Empty<string>(), cityId });
+        var preview = (await resp.Content.ReadFromJsonAsync<List<PreviewResult>>(AdminTestHost.Json))!.Single();
+        Assert.StartsWith("**Заголовок**", preview.Text);
+        Assert.Equal((0L, false), (preview.ChannelId, preview.ChannelConfigured));
     }
 }

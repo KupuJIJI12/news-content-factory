@@ -91,6 +91,10 @@ public static class StoryEndpoints
                 return Problems.Conflict("daily_limit_exceeded", ex.Message,
                     new { ex.Check.Published, ex.Check.Scheduled, ex.Check.Limit });
             }
+            catch (NoEnabledChannelException ex)
+            {
+                return Problems.Conflict("no_channel", ex.Message);
+            }
         }));
 
         api.MapPost("/stories/{id:long}/cancel", (long id, NewsFactoryDbContext db, PublicationService publications, CancellationToken ct) =>

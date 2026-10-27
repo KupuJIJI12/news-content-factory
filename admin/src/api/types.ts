@@ -50,9 +50,10 @@ export interface StoryDetail {
 export interface DraftInput { title: string; body: string; hashtags: string[] }
 export interface PublishInput { at?: string; imageId?: number; overrideLimit: boolean }
 export interface PublishResponse { publicationIds: number[] }
-export interface PreviewInput { title: string; body: string; hashtags: string[]; imageCredit?: string | null }
+export interface PreviewInput { title: string; body: string; hashtags: string[]; imageCredit?: string | null; cityId?: number }
 export interface PreviewResult {
   channelId: number; channelName: string; platform: Platform; text: string; length: number; max: number; tooLong: boolean
+  channelConfigured: boolean
 }
 
 export interface SourceDto {

@@ -43,4 +43,13 @@ describe('StoryPage', () => {
     await userEvent.click(await screen.findByRole('button', { name: 'Показать новую' }))
     await waitFor(() => expect(screen.getByLabelText('Заголовок')).toHaveValue('Версия от LLM'))
   })
+
+  it('shows hint when channel is not configured', async () => {
+    vi.mocked(stories.preview).mockImplementation(async () => [{
+      channelId: 0, channelName: 'Max', platform: 'Max', text: '**Заголовок**', length: 13, max: 4000, tooLong: false, channelConfigured: false,
+    }])
+    page()
+    expect(await screen.findByText(/Канал Max не настроен/)).toBeInTheDocument()
+    expect(screen.getByRole('link', { name: 'Настроить канал' })).toHaveAttribute('href', '/settings')
+  })
 })

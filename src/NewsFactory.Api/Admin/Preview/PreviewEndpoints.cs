@@ -6,9 +6,11 @@ using NewsFactory.Publishing.Max;
 
 namespace NewsFactory.Api.Admin.Preview;
 
-public sealed record PreviewRequest(string Title, string Body, IReadOnlyList<string>? Hashtags, string? ImageCredit);
+public sealed record PreviewRequest(string Title, string Body, IReadOnlyList<string>? Hashtags, string? ImageCredit, long? CityId = null);
 
-public sealed record PreviewResult(long ChannelId, string ChannelName, Platform Platform, string Text, int Length, int Max, bool TooLong);
+/// <summary>ChannelConfigured=false: the city has no enabled channel; the text is still the Max rendering.</summary>
+public sealed record PreviewResult(long ChannelId, string ChannelName, Platform Platform, string Text, int Length, int Max, bool TooLong,
+    bool ChannelConfigured = true);
 
 public static class PreviewEndpoints
 {
@@ -17,12 +19,13 @@ public static class PreviewEndpoints
         {
             var post = new PostContent(request.Title ?? "", request.Body ?? "", request.Hashtags ?? [],
                 request.ImageCredit is { Length: > 0 } credit ? new PostImage("", credit) : null);
-            var channels = await db.Channels.Where(c => c.IsEnabled).OrderBy(c => c.Id).ToListAsync(ct);
-            return channels.Select(c =>
-            {
-                var text = MaxMarkupConverter.Render(post);
-                return new PreviewResult(c.Id, c.Name, c.Platform, text, text.Length, MaxMarkupConverter.MaxLength,
-                    text.Length > MaxMarkupConverter.MaxLength);
-            }).ToList();
+            var channels = await db.Channels.Where(c => c.IsEnabled && (request.CityId == null || c.CityId == request.CityId))
+                .OrderBy(c => c.Id).ToListAsync(ct);
+            var text = MaxMarkupConverter.Render(post);
+            var tooLong = text.Length > MaxMarkupConverter.MaxLength;
+            if (channels.Count == 0)
+                return [new PreviewResult(0, "Max", Platform.Max, text, text.Length, MaxMarkupConverter.MaxLength, tooLong, ChannelConfigured: false)];
+            return channels.Select(c => new PreviewResult(c.Id, c.Name, c.Platform, text, text.Length, MaxMarkupConverter.MaxLength, tooLong))
+                .ToList();
         });
 }

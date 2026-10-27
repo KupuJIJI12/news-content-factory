@@ -15,11 +15,11 @@ public sealed class PublicationService(NewsFactoryDbContext db, IPipelineQueue q
         await using var tx = await db.Database.BeginTransactionAsync(ct);
         await LockStoryAsync(storyId, ct);
         var story = await db.Stories.Include(s => s.City).Include(s => s.Drafts).SingleAsync(s => s.Id == storyId, ct);
+        var channels = await db.Channels.Where(c => c.CityId == story.CityId && c.IsEnabled).ToListAsync(ct);
+        if (channels.Count == 0) throw new NoEnabledChannelException(story.City!.Name);
         story.TransitionTo(StoryStatus.Scheduled);
         var draft = story.Drafts.SingleOrDefault(d => d.IsCurrent)
                     ?? throw new InvalidOperationException("У сюжета нет текущего черновика");
-        var channels = await db.Channels.Where(c => c.CityId == story.CityId && c.IsEnabled).ToListAsync(ct);
-        if (channels.Count == 0) throw new InvalidOperationException("У города нет включённых каналов");
 
         var publishAt = at ?? time.GetUtcNow();
         var tz = TimeZoneInfo.FindSystemTimeZoneById(story.City!.TimeZone);
