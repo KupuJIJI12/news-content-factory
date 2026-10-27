@@ -15,7 +15,7 @@ const pub = (over: Partial<PublicationDto> = {}): PublicationDto => ({
   lastError: null, overrideLimit: false, ...over,
 })
 
-const today = (published: number, scheduled: number, limit = 4) => ({ channelId: 1, name: 'Max', published, scheduled, limit })
+const today = (published: number, scheduled: number, limit = 4) => ({ channelId: 1, name: 'Max', published, scheduled, limit, cityId: 1, cityName: 'Отрадный' })
 
 describe('PublishPanel', () => {
   beforeEach(() => {

@@ -83,8 +83,8 @@ export function StoryPage() {
     placeholderData: (prev) => prev,
   })
   const maxPreview = previews?.find((p) => p.platform === 'Max') ?? previews?.[0]
-  const today = useMemo(() => counters?.today.find((t) => t.cityName === story?.cityName)
-    ?? (counters?.today.length === 1 ? counters.today[0] : undefined), [counters, story])
+  // Only the story's own city channel: another city's limit says nothing about this publication.
+  const today = useMemo(() => counters?.today.find((t) => t.cityId === story?.cityId), [counters, story])
 
   if (isLoading) return <Center h={200}><Loader /></Center>
   if (error || !story) return <Alert color="red">Сюжет не найден. <Anchor component={Link} to="/">К очереди</Anchor></Alert>

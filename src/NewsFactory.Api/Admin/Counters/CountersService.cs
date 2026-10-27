@@ -7,7 +7,7 @@ using NewsFactory.Llm;
 
 namespace NewsFactory.Api.Admin.Counters;
 
-public sealed record ChannelToday(long ChannelId, string Name, int Published, int Scheduled, int Limit, string CityName = "");
+public sealed record ChannelToday(long ChannelId, string Name, int Published, int Scheduled, int Limit, long CityId = 0, string CityName = "");
 
 public sealed record ErrorBreakdown(int SourcesFailing, int SourcesSilent, int StoriesProcessingFailed, int StoriesPublishFailed,
     int RawItemsFailed24h, bool BudgetExceeded)
@@ -50,7 +50,7 @@ public sealed class CountersService(NewsFactoryDbContext db, TimeProvider time)
         {
             var pubs = await db.Publications.Where(p => p.ChannelId == channel.Id && p.ScheduledAt >= dayStart.AddDays(-1)).ToListAsync(ct);
             var check = DailyLimitPolicy.Check(channel.DailyLimit, pubs, now, TimeZoneInfo.FindSystemTimeZoneById(channel.City!.TimeZone));
-            today.Add(new ChannelToday(channel.Id, channel.Name, check.Published, check.Scheduled, check.Limit, channel.City!.Name));
+            today.Add(new ChannelToday(channel.Id, channel.Name, check.Published, check.Scheduled, check.Limit, channel.CityId, channel.City!.Name));
         }
 
         return new Counters(

@@ -9,7 +9,7 @@ const counters: Counters = {
   withUpdates: 1,
   errors: { sourcesFailing: 1, sourcesSilent: 1, storiesProcessingFailed: 0, storiesPublishFailed: 0, rawItemsFailed24h: 0,
     budgetExceeded: false, total: 2 },
-  today: [{ channelId: 1, name: 'Max', published: 2, scheduled: 1, limit: 4 }],
+  today: [{ channelId: 1, name: 'Max', published: 2, scheduled: 1, limit: 4, cityId: 1, cityName: 'Отрадный' }],
   collectionPaused: false,
 }
 

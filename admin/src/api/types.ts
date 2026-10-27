@@ -14,7 +14,7 @@ export type FactCheckIssueSource = 'Deterministic' | 'Llm'
 
 export interface Me { id: number; login: string; timeZone: string }
 
-export interface ChannelToday { channelId: number; name: string; published: number; scheduled: number; limit: number; cityName?: string }
+export interface ChannelToday { channelId: number; name: string; published: number; scheduled: number; limit: number; cityId: number; cityName: string }
 export interface ErrorBreakdown {
   sourcesFailing: number; sourcesSilent: number; storiesProcessingFailed: number; storiesPublishFailed: number
   rawItemsFailed24h: number; budgetExceeded: boolean; total: number

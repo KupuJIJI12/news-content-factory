@@ -52,4 +52,16 @@ describe('StoryPage', () => {
     expect(await screen.findByText(/Канал Max не настроен/)).toBeInTheDocument()
     expect(screen.getByRole('link', { name: 'Настроить канал' })).toHaveAttribute('href', '/settings')
   })
+
+  it('shows the daily limit of the story city only', async () => {
+    vi.mocked(counters.getCounters).mockImplementation(async () => ({
+      onReview: 1, withUpdates: 0, collectionPaused: false,
+      errors: { sourcesFailing: 0, sourcesSilent: 0, storiesProcessingFailed: 0, storiesPublishFailed: 0, rawItemsFailed24h: 0, budgetExceeded: false, total: 0 },
+      today: [{ channelId: 3, name: 'Кинель — Max', cityId: 2, cityName: 'Кинель', published: 4, scheduled: 0, limit: 4 }],
+    }))
+    page()
+    expect(await screen.findByLabelText('Заголовок')).toBeInTheDocument()
+    expect(screen.queryByText(/Сегодня 4\/4/)).not.toBeInTheDocument()
+    expect(screen.queryByText(/Дневной лимит будет превышен/)).not.toBeInTheDocument()
+  })
 })
