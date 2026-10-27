@@ -578,8 +578,7 @@ namespace NewsFactory.Infrastructure.Migrations
 
                     b.HasKey("Id");
 
-                    b.HasIndex("Url")
-                        .IsUnique();
+                    b.HasIndex("Url");
 
                     b.ToTable("Sources");
                 });

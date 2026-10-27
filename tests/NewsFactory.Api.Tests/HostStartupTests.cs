@@ -18,7 +18,7 @@ public class HostStartupTests(PostgresFixture db)
     {
         b.UseSetting("ConnectionStrings:Postgres", db.ConnectionString);
         b.UseSetting("YANDEX_FOLDER_ID", "f1");
-        b.UseSetting("Hangfire:WorkerCount", "1");
+        b.UseSetting("Hangfire:ServerEnabled", "false");
     });
 
     [Fact]

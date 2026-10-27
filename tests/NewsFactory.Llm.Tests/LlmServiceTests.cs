@@ -1,3 +1,4 @@
+using System.Text.Json;
 using System.Text.Json.Nodes;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Time.Testing;
@@ -66,6 +67,39 @@ public class LlmServiceTests(PostgresFixture db)
         Assert.True(call.Success);
         Assert.Equal((LlmTask.Scoring, 100, 20, 5L), (call.Task, call.PromptTokens, call.CompletionTokens, call.StoryId!.Value));
         Assert.NotNull(JsonNode.Parse(call.Request));
+    }
+
+    [Fact]
+    public async Task System_prompt_shows_an_example_answer_not_a_schema()
+    {
+        await SeedAsync();
+        var client = new ScriptedChatClient("""{"score":7,"reason":"ok"}""");
+        await using var ctx = db.CreateContext(_time);
+        await Service(ctx, client).CompleteAsync<ScoringResult>(LlmTask.Scoring, Vars, new LlmCallContext());
+
+        var system = client.Requests.Single().Messages[0].Content;
+        Assert.DoesNotContain("properties", system); // GigaChat copies a schema back instead of answering
+        var example = JsonNode.Parse(system[system.IndexOf('{')..(system.LastIndexOf('}') + 1)])!.AsObject();
+        Assert.Equal(["score", "reason"], example.Select(p => p.Key));
+        Assert.Equal(JsonValueKind.Number, example["score"]!.GetValueKind());
+        Assert.Equal(JsonValueKind.String, example["reason"]!.GetValueKind());
+    }
+
+    [Fact]
+    public void Example_covers_arrays_and_nested_objects()
+    {
+        var example = LlmExample.For<FactCheckResult>().AsObject();
+        var issue = example["issues"]!.AsArray().Single()!.AsObject();
+        Assert.Equal(["claim", "problem"], issue.Select(p => p.Key));
+        var rewrite = LlmExample.For<RewriteResult>().AsObject();
+        Assert.Equal(JsonValueKind.String, rewrite["hashtags"]!.AsArray().Single()!.GetValueKind());
+    }
+
+    [Fact]
+    public void Schema_for_structured_output_declares_integers_as_integers()
+    {
+        var schema = LlmExample.SchemaFor<ScoringResult>();
+        Assert.Equal("integer", schema["properties"]!["score"]!["type"]!.GetValue<string>());
     }
 
     [Fact]

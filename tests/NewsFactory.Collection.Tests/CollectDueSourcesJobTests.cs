@@ -31,4 +31,25 @@ public class CollectDueSourcesJobTests(PostgresFixture db)
         await new CollectDueSourcesJob(ctx, queue, time).RunAsync(default);
         Assert.Equal(new[] { a.Id, b.Id }.Order(), queue.Enqueued.Order());
     }
+
+    [Fact]
+    public async Task Paused_collection_enqueues_nothing()
+    {
+        await db.ResetAsync();
+        var time = new FakeTimeProvider(DateTimeOffset.Parse("2026-10-23T12:00:00Z"));
+        await using var ctx = db.CreateContext(time);
+        ctx.Add(TestData.RssSource());
+        await ctx.SaveChangesAsync();
+        var pause = new CollectionPause(ctx);
+        await pause.SetAsync(true, default);
+
+        var queue = new RecordingCollectQueue();
+        await new CollectDueSourcesJob(ctx, queue, time).RunAsync(default);
+        Assert.Empty(queue.Enqueued);
+        Assert.True(await pause.IsPausedAsync(default));
+
+        await pause.SetAsync(false, default);
+        await new CollectDueSourcesJob(ctx, queue, time).RunAsync(default);
+        Assert.Single(queue.Enqueued);
+    }
 }

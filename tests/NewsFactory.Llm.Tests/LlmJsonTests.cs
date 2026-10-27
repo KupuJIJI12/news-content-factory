@@ -20,6 +20,28 @@ public class LlmJsonTests
     }
 
     [Fact]
+    public void Accepts_data_wrapped_in_schema_properties()
+    {
+        // Real GigaChat-2 answer: the data was put where a JSON schema keeps its field definitions.
+        var r = LlmJson.Parse<ScoringResult>("""
+            { "type": "object", "properties": { "score": 2, "reason": "Протокольное сообщение без практической пользы" } }
+            """);
+        Assert.True(r.Ok, string.Join("; ", r.Errors));
+        Assert.Equal((2, "Протокольное сообщение без практической пользы"), (r.Value!.Score, r.Value.Reason));
+    }
+
+    [Fact]
+    public void Schema_echo_is_reported_as_schema()
+    {
+        var r = LlmJson.Parse<ScoringResult>("""
+            { "type": "object", "properties": { "score": { "type": "integer", "minimum": 1, "maximum": 10 }, "reason": { "type": "string" } },
+              "required": [ "score", "reason" ] }
+            """);
+        Assert.False(r.Ok);
+        Assert.Contains(r.Errors, e => e.Contains("схем"));
+    }
+
+    [Fact]
     public void Out_of_range_score_is_error() =>
         Assert.False(LlmJson.Parse<ScoringResult>("""{"score": 11, "reason": "x"}""").Ok);
 

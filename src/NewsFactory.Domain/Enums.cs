@@ -2,7 +2,7 @@ namespace NewsFactory.Domain;
 
 public enum SourceType { Rss, Html, Vk }
 
-public enum RawItemStatus { New, SkippedOld, Irrelevant, Relevant, Clustered, Failed }
+public enum RawItemStatus { New, SkippedOld, Irrelevant, Relevant, Clustered, Failed, Duplicate }
 
 public enum StoryStatus
 {
@@ -21,7 +21,7 @@ public enum Platform { Max }
 
 public enum PublicationStatus { Scheduled, Sending, Published, Failed, Unknown, Cancelled }
 
-public enum LlmTask { Relevance, Clustering, Scoring, Rewrite, FactCheck }
+public enum LlmTask { Relevance, Clustering, Scoring, Rewrite, FactCheck, SourceSetup }
 
 public enum LlmProviderKind { OpenAiCompatible, GigaChat }
 

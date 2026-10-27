@@ -1,6 +1,5 @@
 using System.Diagnostics;
 using System.Text.Json;
-using System.Text.Json.Schema;
 using Microsoft.EntityFrameworkCore;
 using NewsFactory.Domain;
 using NewsFactory.Domain.Entities;
@@ -26,10 +25,12 @@ public sealed class LlmService(NewsFactoryDbContext db, IDbContextFactory<NewsFa
                        ?? throw new InvalidOperationException($"Нет активного промпта для задачи {task}");
         var client = clients.Resolve(setting.Provider!);
 
-        var schema = JsonSchemaExporter.GetJsonSchemaAsNode(Json, typeof(T));
+        var schema = LlmExample.SchemaFor<T>();
+        var example = LlmExample.FromSchema(schema).ToJsonString(new JsonSerializerOptions { Encoder = System.Text.Encodings.Web.JavaScriptEncoder.UnsafeRelaxedJsonEscaping });
         var messages = new List<ChatMessage>
         {
-            new("system", "Отвечай только JSON-объектом, соответствующим схеме:\n" + schema.ToJsonString()),
+            new("system", "Отвечай только одним JSON-объектом с теми же полями, что в образце, подставив свои значения. " +
+                          "Не присылай схему и не добавляй пояснений. Образец ответа:\n" + example),
             new("user", PromptRenderer.Render(template.Text, vars)),
         };
 
