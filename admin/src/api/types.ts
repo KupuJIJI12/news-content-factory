@@ -72,6 +72,11 @@ export interface SourceCity { cityId: number; cityName: string; isDedicated: boo
 export interface SourceCityInput { cityId: number; isDedicated: boolean }
 export interface SourceTestItem { title: string; url: string; publishedAt: string | null; textPreview: string; imageCount: number }
 export interface SourceTestResult { ok: boolean; error: string | null; items: SourceTestItem[] }
+export type AutoSetupMethod = 'Rss' | 'Heuristic' | 'Llm'
+export interface AutoSetupResult {
+  ok: boolean; method: AutoSetupMethod | null; type: SourceType | null; url: string | null; config: string | null
+  items: SourceTestItem[]; message: string
+}
 export interface HtmlSourceConfig {
   listUrl: string; itemSelector: string; linkSelector: string; titleSelector?: string | null; dateSelector?: string | null
   dateFormat?: string | null; bodySelector?: string | null; imageSelector?: string | null

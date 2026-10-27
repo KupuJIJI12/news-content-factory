@@ -1,11 +1,11 @@
 import { useEffect, useState } from 'react'
-import { Button, Checkbox, Divider, Group, NumberInput, Paper, SegmentedControl, Stack, Switch, Text, TextInput } from '@mantine/core'
+import { Alert, Button, Checkbox, Collapse, Divider, Group, NumberInput, Paper, SegmentedControl, Stack, Switch, Text, TextInput } from '@mantine/core'
 import { useQueryClient } from '@tanstack/react-query'
 import { notifications } from '@mantine/notifications'
 import { ApiError } from '../api/client'
 import { fieldErrors } from '../api/settings'
-import { createSource, sourcesKey, testSource, updateSource } from '../api/sources'
-import type { HtmlSourceConfig, SourceDto, SourceInput, SourceTestResult as Result, SourceType } from '../api/types'
+import { autodetectSource, createSource, sourcesKey, testSource, updateSource } from '../api/sources'
+import type { AutoSetupResult, HtmlSourceConfig, SourceDto, SourceInput, SourceTestResult as Result, SourceType } from '../api/types'
 import { useCities } from '../lib/useCities'
 import { useCityTimeZone } from '../lib/useCityTimeZone'
 import { SourceTestResult } from './SourceTestResult'
@@ -20,6 +20,8 @@ const HTML_FIELDS: { key: keyof HtmlSourceConfig; label: string; required?: bool
   { key: 'bodySelector', label: 'Селектор текста статьи' },
   { key: 'imageSelector', label: 'Селектор фото статьи' },
 ]
+
+const METHOD_LABEL = { Rss: 'Найдена RSS-лента', Heuristic: 'Определено по структуре страницы', Llm: 'Подобрано LLM' } as const
 
 function parse<T>(json: string | null): Partial<T> {
   if (!json) return {}
@@ -60,8 +62,11 @@ export function SourceForm({ source, onSaved }: { source: SourceDto | null; onSa
   const [html, setHtml] = useState<Partial<HtmlSourceConfig>>(source?.type === 'Html' ? parse<HtmlSourceConfig>(source.config) : {})
   const [screenName, setScreenName] = useState(source?.type === 'Vk' ? (parse<{ screenName: string }>(source.config).screenName ?? '') : '')
   const [errors, setErrors] = useState<Record<string, string>>({})
-  const [busy, setBusy] = useState<'save' | 'test' | null>(null)
+  const [busy, setBusy] = useState<'save' | 'test' | 'auto' | null>(null)
   const [result, setResult] = useState<Result | null>(null)
+  const [siteUrl, setSiteUrl] = useState('')
+  const [auto, setAuto] = useState<AutoSetupResult | null>(null)
+  const [manual, setManual] = useState(source?.type === 'Html')
 
   const input = (): SourceInput => ({
     name: name.trim(), type, url: url.trim(), config: buildConfig(type, html, screenName), pollIntervalMinutes: poll,
@@ -90,6 +95,34 @@ export function SourceForm({ source, onSaved }: { source: SourceDto | null; onSa
     }
   }
 
+  async function autodetect() {
+    setBusy('auto')
+    setErrors({})
+    setAuto(null)
+    setResult(null)
+    try {
+      const r = await autodetectSource(siteUrl.trim())
+      setAuto(r)
+      if (r.ok && r.type && r.url) {
+        setType(r.type)
+        setUrl(r.url)
+        if (r.type === 'Html') setHtml(parse<HtmlSourceConfig>(r.config))
+        if (!name.trim()) setName(new URL(r.url).hostname.replace(/^www\./, ''))
+        setResult({ ok: true, error: null, items: r.items })
+      } else {
+        // Nothing found automatically: continue by hand from the same address.
+        setType('Html')
+        setUrl((u) => u || siteUrl.trim())
+        setHtml((h) => ({ ...h, listUrl: h.listUrl || siteUrl.trim() }))
+        setManual(true)
+      }
+    } catch (err) {
+      fail(err)
+    } finally {
+      setBusy(null)
+    }
+  }
+
   async function test() {
     setBusy('test')
     setErrors({})
@@ -105,6 +138,27 @@ export function SourceForm({ source, onSaved }: { source: SourceDto | null; onSa
 
   return (
     <Stack gap="sm">
+      <Paper withBorder p="sm" bg="var(--mantine-color-default-hover)">
+        <Stack gap={6}>
+          <Text size="sm" fw={500}>Автонастройка</Text>
+          <Text size="xs" c="dimmed">
+            Укажите страницу сайта со списком новостей. Система поищет RSS-ленту, затем определит список по структуре
+            страницы, а если не выйдет — попросит LLM подобрать селекторы. Найденные новости появятся ниже для проверки.
+          </Text>
+          <Group align="flex-end" gap="xs" wrap="nowrap">
+            <TextInput style={{ flex: 1 }} label="Сайт для автонастройки" placeholder="https://…" value={siteUrl}
+              onChange={(e) => setSiteUrl(e.currentTarget.value)} />
+            <Button variant="light" loading={busy === 'auto'} disabled={busy !== null || !siteUrl.trim()} onClick={autodetect}>
+              Настроить автоматически
+            </Button>
+          </Group>
+          {auto && (
+            <Alert color={auto.ok ? 'green' : 'orange'} p="xs">
+              <Text size="sm">{auto.ok && auto.method ? `${METHOD_LABEL[auto.method]}. ${auto.message}` : auto.message}</Text>
+            </Alert>
+          )}
+        </Stack>
+      </Paper>
       <SegmentedControl value={type} onChange={(v) => setType(v as SourceType)}
         data={[{ value: 'Rss', label: 'RSS' }, { value: 'Html', label: 'HTML' }, { value: 'Vk', label: 'VK' }]} />
       <TextInput label="Название" value={name} onChange={(e) => setName(e.currentTarget.value)} error={errors.name} />
@@ -113,11 +167,21 @@ export function SourceForm({ source, onSaved }: { source: SourceDto | null; onSa
 
       {type === 'Html' && (
         <Stack gap="xs">
-          <Divider label="Селекторы страницы" labelPosition="left" />
-          {HTML_FIELDS.map((f) => (
-            <TextInput key={f.key} label={f.label} withAsterisk={f.required} description={f.hint} value={(html[f.key] ?? '') as string}
-              onChange={(e) => { const v = e.currentTarget.value; setHtml((h) => ({ ...h, [f.key]: v })) }} />
-          ))}
+          <Group justify="space-between">
+            <Divider label="Селекторы страницы" labelPosition="left" style={{ flex: 1 }} />
+            <Button size="compact-xs" variant="subtle" onClick={() => setManual((m) => !m)}>Ручная настройка</Button>
+          </Group>
+          {!manual && html.itemSelector && (
+            <Text size="xs" c="dimmed">{`Список: ${html.itemSelector} · ссылка: ${html.linkSelector ?? '—'}${html.dateSelector ? ` · дата: ${html.dateSelector}` : ''}`}</Text>
+          )}
+          <Collapse in={manual}>
+            <Stack gap="xs">
+              {HTML_FIELDS.map((f) => (
+                <TextInput key={f.key} label={f.label} withAsterisk={f.required} description={f.hint} value={(html[f.key] ?? '') as string}
+                  onChange={(e) => { const v = e.currentTarget.value; setHtml((h) => ({ ...h, [f.key]: v })) }} />
+              ))}
+            </Stack>
+          </Collapse>
         </Stack>
       )}
       {type === 'Vk' && (
