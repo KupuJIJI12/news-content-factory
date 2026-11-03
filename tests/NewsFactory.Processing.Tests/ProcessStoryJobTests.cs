@@ -131,6 +131,19 @@ public class ProcessStoryJobTests(PostgresFixture db)
     }
 
     [Fact]
+    public async Task Rate_limit_postpones_the_story_instead_of_failing_it()
+    {
+        var resumeAt = DateTimeOffset.Parse("2026-11-03T12:10:00Z");
+        var id = await SeedAsync(StoryStatus.New);
+        _llm.Throw(LlmTask.Scoring, new LlmRateLimitedException(resumeAt, new HttpRequestException("429")));
+        await RunAsync(id);
+        await using var ctx = db.CreateContext();
+        var story = await ctx.Stories.SingleAsync();
+        Assert.Equal((StoryStatus.New, (string?)null), (story.Status, story.LastError));
+        Assert.Equal([(id, resumeAt)], _queue.DelayedStories);
+    }
+
+    [Fact]
     public async Task Failure_after_another_run_finished_does_not_throw_or_override_status()
     {
         var id = await SeedAsync();

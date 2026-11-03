@@ -8,7 +8,8 @@ using NewsFactory.Llm.Clients;
 
 namespace NewsFactory.Llm;
 
-public sealed class LlmService(NewsFactoryDbContext db, IDbContextFactory<NewsFactoryDbContext> logs, ILlmClientResolver clients, LlmBudgetGuard budget) : ILlmService
+public sealed class LlmService(NewsFactoryDbContext db, IDbContextFactory<NewsFactoryDbContext> logs, ILlmClientResolver clients, LlmBudgetGuard budget,
+    LlmThrottle throttle) : ILlmService
 {
     private const int MaxAttempts = 2;
     private static readonly JsonSerializerOptions Json = JsonSerializerOptions.Web;
@@ -47,7 +48,8 @@ public sealed class LlmService(NewsFactoryDbContext db, IDbContextFactory<NewsFa
             ChatCompletion completion;
             try
             {
-                completion = await client.CompleteAsync(new ChatRequest(setting.Model, messages.ToList(), setting.Temperature, schema), ct);
+                var request = new ChatRequest(setting.Model, messages.ToList(), setting.Temperature, schema);
+                completion = await throttle.RunAsync(setting.ProviderId, c => client.CompleteAsync(request, c), ct);
             }
             catch (Exception ex)
             {

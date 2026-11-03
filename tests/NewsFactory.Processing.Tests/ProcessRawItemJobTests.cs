@@ -204,6 +204,18 @@ public class ProcessRawItemJobTests(PostgresFixture db)
     }
 
     [Fact]
+    public async Task Rate_limit_postpones_the_item_instead_of_failing_it()
+    {
+        var resumeAt = DateTimeOffset.Parse("2026-11-03T12:10:00Z");
+        _llm.Throw(LlmTask.Relevance, new LlmRateLimitedException(resumeAt, new HttpRequestException("429")));
+        var (itemId, _) = await SeedAsync(c => TestData.RegionalSource(c));
+        await RunAsync(itemId);
+        await using var read = db.CreateContext();
+        Assert.Equal([(itemId, resumeAt)], _queue.DelayedRawItems);
+        Assert.Equal(RawItemStatus.New, (await read.RawItems.SingleAsync()).Status);
+    }
+
+    [Fact]
     public async Task Unexpected_llm_error_marks_item_failed_with_reason()
     {
         _llm.Throw(LlmTask.Relevance, new HttpRequestException("LLM недоступна"));

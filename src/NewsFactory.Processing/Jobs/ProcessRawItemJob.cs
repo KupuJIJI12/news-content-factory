@@ -48,11 +48,11 @@ public sealed class ProcessRawItemJob(NewsFactoryDbContext db, RelevanceStage re
 
             if (enqueue) queue.EnqueueStory(story.Id);
         }
-        catch (LlmBudgetExceededException ex)
+        catch (LlmPostponedException ex) // budget spent or the provider rate-limits us: try again later, not a failure
         {
             queue.DelayRawItem(rawItemId, ex.ResumeAt);
         }
-        catch (Exception ex) when (ex is not LlmBudgetExceededException && !ct.IsCancellationRequested)
+        catch (Exception ex) when (ex is not LlmPostponedException && !ct.IsCancellationRequested)
         {
             db.ChangeTracker.Clear();
             var fresh = await db.RawItems.SingleAsync(r => r.Id == rawItemId, ct);

@@ -37,7 +37,9 @@ internal static class LlmLiveScenario
 
             var samara = TimeZoneInfo.FindSystemTimeZoneById("Europe/Samara");
             var llm = new LlmService(ctx, db.CreateFactory(), new LlmClientFactory(new SimpleFactory(), config, TimeProvider.System),
-                new LlmBudgetGuard(ctx, TimeProvider.System, samara));
+                new LlmBudgetGuard(ctx, TimeProvider.System, samara),
+                // the same pacing as in production, so live runs against GigaChat do not trip its 429 limit
+                new LlmThrottle(Microsoft.Extensions.Options.Options.Create(new LlmThrottleOptions()), TimeProvider.System));
             var sources = "### Источник 1: otradny.org\nВ Отрадном поздравили работников транспорта\n"
                           + await File.ReadAllTextAsync("Fixtures/story.txt");
 

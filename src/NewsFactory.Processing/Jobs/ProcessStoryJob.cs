@@ -29,7 +29,7 @@ public sealed class ProcessStoryJob(NewsFactoryDbContext db, ILlmService llm, IP
         {
             await ProcessAsync(story, previous, forceDraft, hint, ct);
         }
-        catch (LlmBudgetExceededException ex)
+        catch (LlmPostponedException ex) // budget spent or the provider rate-limits us: try again later, not a failure
         {
             db.ChangeTracker.Clear();
             var fresh = await db.Stories.SingleAsync(s => s.Id == storyId, ct);

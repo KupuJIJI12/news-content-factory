@@ -42,7 +42,8 @@ public class LlmServiceTests(PostgresFixture db)
     }
 
     private LlmService Service(NewsFactoryDbContext ctx, ScriptedChatClient client) =>
-        new(ctx, db.CreateFactory(_time), client, new LlmBudgetGuard(ctx, _time, Samara));
+        new(ctx, db.CreateFactory(_time), client, new LlmBudgetGuard(ctx, _time, Samara),
+            new LlmThrottle(Microsoft.Extensions.Options.Options.Create(new LlmThrottleOptions { MinIntervalMs = 0 }), _time));
 
     private static readonly Dictionary<string, string> Vars = new() { ["city"] = "Отрадный", ["sources"] = "текст" };
 
