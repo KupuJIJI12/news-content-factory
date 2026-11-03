@@ -67,12 +67,15 @@ export function DraftEditor({ story, value, onChange, dirty, onSaved, onDiscard 
         onChange={(e) => onChange({ ...value, body: e.currentTarget.value })} />
       <TagsInput label="Хэштеги" value={value.hashtags} disabled={!canEdit} onChange={(hashtags) => onChange({ ...value, hashtags })} />
       <Group justify="space-between">
-        <Text size="xs" c="dimmed">{story.currentDraft ? `Версия ${story.currentDraft.version}${story.currentDraft.byHuman ? ' (правка)' : ''}` : 'Черновика ещё нет'}</Text>
-        <Button onClick={save} disabled={!canEdit || !dirty} loading={busy}>Сохранить</Button>
+        <Text size="xs" c="ink.6">{story.currentDraft ? `Версия ${story.currentDraft.version}${story.currentDraft.byHuman ? ' (правка)' : ''}` : 'Черновика ещё нет'}</Text>
+        <Button variant="default" onClick={save} disabled={!canEdit || !dirty} loading={busy}>Сохранить</Button>
       </Group>
 
+      {story.currentDraft && issues.length === 0 && (
+        <Text size="sm" c="teal.7">Проверка фактов: расхождений с источником нет</Text>
+      )}
       {issues.length > 0 && (
-        <Paper withBorder p="sm" bg="var(--mantine-color-yellow-light)">
+        <Paper p="sm" bg="amber.0" style={{ border: '1px solid var(--mantine-color-amber-2)' }}>
           <Title order={6} mb={4}>Замечания проверки фактов</Title>
           <List size="sm" spacing={4}>
             {issues.map((i, n) => (
@@ -83,7 +86,7 @@ export function DraftEditor({ story, value, onChange, dirty, onSaved, onDiscard 
               </List.Item>
             ))}
           </List>
-          <Text size="xs" c="dimmed" mt="xs">Текст с подсветкой:</Text>
+          <Text size="xs" c="ink.6" mt="xs">Текст с подсветкой:</Text>
           <Highlight highlight={claims} size="sm" style={{ whiteSpace: 'pre-wrap' }}>{value.body}</Highlight>
         </Paper>
       )}
@@ -92,7 +95,7 @@ export function DraftEditor({ story, value, onChange, dirty, onSaved, onDiscard 
         <Group align="flex-end" gap="xs" wrap="nowrap">
           <TextInput style={{ flex: 1 }} label="Пожелание к новой версии" placeholder="например: короче, без кликбейта"
             value={hint} onChange={(e) => setHint(e.currentTarget.value)} />
-          <Button variant="light" loading={busy} onClick={() => (dirty ? setConfirm(true) : doRegenerate())}>Перегенерировать</Button>
+          <Button variant="default" loading={busy} onClick={() => (dirty ? setConfirm(true) : doRegenerate())}>Перегенерировать</Button>
         </Group>
       )}
 
@@ -121,7 +124,7 @@ export function DraftEditor({ story, value, onChange, dirty, onSaved, onDiscard 
           <Text>Есть несохранённые правки. Новая версия от LLM их не учтёт.</Text>
           <Group justify="flex-end">
             <Button variant="default" onClick={() => setConfirm(false)}>Отмена</Button>
-            <Button color="orange" onClick={doRegenerate}>Перегенерировать всё равно</Button>
+            <Button color="amber.8" onClick={doRegenerate}>Перегенерировать всё равно</Button>
           </Group>
         </Stack>
       </Modal>

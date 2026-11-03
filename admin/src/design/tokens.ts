@@ -1,0 +1,23 @@
+/** «Пульт выпускающего»: a quiet, dense editorial console. Colour means status or interest, never decoration. */
+export const tokens = {
+  ground: '#EDF0F3',
+  surface: '#FFFFFF',
+  panel: '#F6F8FA',
+  line: '#D5DCE3',
+  lineSoft: '#E4E9EE',
+  field: '#C5CED8',
+  ink: '#1C2633',
+  inkSoft: '#3A4552',
+  muted: '#5A6675',
+  faint: '#AEB8C4',
+  amber: '#D9921A',
+  amberTint: '#FBEFD8',
+  amberInk: '#6B4A0E',
+  teal: '#16806F',
+  tealTint: '#E2F2EE',
+  brick: '#B8432F',
+  brickTint: '#F8E6E2',
+  link: '#2F5DA8',
+  display: "'Geologica Variable', 'Golos Text Variable', system-ui, sans-serif",
+  text: "'Golos Text Variable', system-ui, -apple-system, 'Segoe UI', sans-serif",
+} as const

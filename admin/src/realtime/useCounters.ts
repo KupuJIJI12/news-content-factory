@@ -3,7 +3,7 @@ import { useQuery, useQueryClient } from '@tanstack/react-query'
 import { HubConnectionBuilder, LogLevel } from '@microsoft/signalr'
 import { countersKey, getCounters } from '../api/counters'
 import type { Counters } from '../api/types'
-import { pageTitle } from '../layout/CountersBar'
+import { pageTitle } from '../layout/ChannelMeter'
 
 /** Live counters: initial GET, then SignalR "CountersChanged"; also keeps the tab title in sync. */
 export function useCounters(): Counters | undefined {

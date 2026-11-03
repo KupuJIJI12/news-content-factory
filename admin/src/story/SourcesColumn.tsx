@@ -1,34 +1,38 @@
-import { Anchor, Badge, Group, Image, Paper, SimpleGrid, Spoiler, Stack, Text, Title } from '@mantine/core'
+import { Anchor, Badge, Group, Image, SimpleGrid, Spoiler, Stack, Text } from '@mantine/core'
 import type { StorySourceDto } from '../api/types'
+import { tokens } from '../design/tokens'
 import { formatInCity } from '../lib/cityTime'
 
 export function SourcesColumn({ sources, tz }: { sources: StorySourceDto[]; tz: string }) {
   return (
     <Stack gap="sm">
       {sources.map((s) => (
-        <Paper key={s.rawItemId} withBorder p="sm">
-          <Group justify="space-between" wrap="nowrap" mb={4}>
+        <article key={s.rawItemId} style={{
+          background: tokens.surface, border: `1px solid ${tokens.lineSoft}`, borderRadius: 8, padding: 14,
+          display: 'flex', flexDirection: 'column', gap: 8,
+        }}>
+          <Group justify="space-between" wrap="nowrap" gap="xs">
             <Text fw={600} size="sm">{s.sourceName}</Text>
-            {s.publishedAt && <Text size="xs" c="dimmed">{formatInCity(s.publishedAt, tz)}</Text>}
+            {s.publishedAt && <Text size="xs" c="ink.6" style={{ whiteSpace: 'nowrap' }}>{formatInCity(s.publishedAt, tz)}</Text>}
           </Group>
-          <Title order={6} mb={4}>{s.title}</Title>
-          <Spoiler maxHeight={160} showLabel="Показать полностью" hideLabel="Свернуть">
-            <Text size="sm" style={{ whiteSpace: 'pre-wrap' }}>{s.text}</Text>
+          <Text fw={600} size="sm">{s.title}</Text>
+          <Spoiler maxHeight={160} showLabel="Показать полностью" hideLabel="Свернуть" styles={{ control: { fontSize: 13 } }}>
+            <Text size="sm" c="ink.7" lh={1.55} style={{ whiteSpace: 'pre-wrap' }}>{s.text}</Text>
           </Spoiler>
-          <Anchor href={s.url} target="_blank" rel="noreferrer" size="xs">Открыть оригинал</Anchor>
+          <Anchor href={s.url} target="_blank" rel="noreferrer" size="xs" c={tokens.link}>Открыть оригинал</Anchor>
           {s.images.length > 0 && (
-            <SimpleGrid cols={3} spacing={4} mt="xs">
+            <SimpleGrid cols={3} spacing={4}>
               {s.images.map((img) => (
                 <Stack key={img.url} gap={2}>
                   <Image src={img.url} alt="" h={70} fit="cover" radius="sm" referrerPolicy="no-referrer" />
-                  <Badge size="xs" color={img.allowed ? 'green' : 'gray'} variant="light">
+                  <Badge size="xs" color={img.allowed ? 'teal' : 'ink'} variant="light">
                     {img.allowed ? 'можно с подписью' : 'нет разрешения'}
                   </Badge>
                 </Stack>
               ))}
             </SimpleGrid>
           )}
-        </Paper>
+        </article>
       ))}
     </Stack>
   )

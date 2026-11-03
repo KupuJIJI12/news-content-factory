@@ -1,5 +1,6 @@
 import { Fragment, type ReactNode } from 'react'
-import { Alert, Box, Image, Paper, Text } from '@mantine/core'
+import { Alert, Box, Image, Text } from '@mantine/core'
+import { tokens } from '../design/tokens'
 
 /** Renders the subset of Max markdown our posts use: **bold**, line breaks, "• " bullets, hashtags. Everything else is text. */
 function renderLine(line: string, key: number): ReactNode {
@@ -10,7 +11,7 @@ function renderLine(line: string, key: number): ReactNode {
   for (const m of line.matchAll(pattern)) {
     if (m.index! > last) parts.push(line.slice(last, m.index))
     if (m[1] !== undefined) parts.push(<strong key={`b${i++}`}>{m[1]}</strong>)
-    else parts.push(<span key={`h${i++}`} data-hashtag style={{ color: 'var(--mantine-color-blue-6)' }}>{m[2]}</span>)
+    else parts.push(<span key={`h${i++}`} data-hashtag style={{ color: tokens.link }}>{m[2]}</span>)
     last = m.index! + m[0].length
   }
   if (last < line.length) parts.push(line.slice(last))
@@ -23,20 +24,20 @@ export function MaxPostPreview({ text, imageUrl, tooLong, length, max }: {
   const paragraphs = text.split(/\n{2,}/)
   return (
     <Box>
-      {tooLong && <Alert color="red" mb="sm">{`Пост длиннее ${max} символов (${length})`}</Alert>}
-      <Paper withBorder radius="lg" p={0} maw={420} style={{ overflow: 'hidden', background: 'var(--mantine-color-default)' }}>
+      {tooLong && <Alert color="brick" mb="sm">{`Пост длиннее ${max} символов (${length})`}</Alert>}
+      <div style={{ maxWidth: 420, overflow: 'hidden', background: tokens.surface, border: `1px solid ${tokens.lineSoft}`, borderRadius: 12 }}>
         {imageUrl && <Image src={imageUrl} alt="" mah={280} fit="cover" />}
-        <Box p="sm">
+        <Box px={16} py={14}>
           {paragraphs.map((p, pi) => (
-            <Text key={pi} size="sm" mb={pi < paragraphs.length - 1 ? 'xs' : 0} style={{ whiteSpace: 'pre-wrap', wordBreak: 'break-word' }}>
+            <Text key={pi} size="sm" lh={1.55} mb={pi < paragraphs.length - 1 ? 10 : 0} style={{ whiteSpace: 'pre-wrap', wordBreak: 'break-word' }}>
               {p.split('\n').map((line, li, lines) => (
                 <Fragment key={li}>{renderLine(line, li)}{li < lines.length - 1 && '\n'}</Fragment>
               ))}
             </Text>
           ))}
         </Box>
-      </Paper>
-      <Text size="xs" c={tooLong ? 'red' : 'dimmed'} mt={4}>{`${length} / ${max}`}</Text>
+      </div>
+      <Text size="xs" c={tooLong ? 'brick.6' : 'ink.6'} mt={6}>{`${length} из ${max} символов`}</Text>
     </Box>
   )
 }

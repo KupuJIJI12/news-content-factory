@@ -1,9 +1,10 @@
 import { useState } from 'react'
-import { Alert, Button, Group, Modal, Paper, Stack, Text, TextInput } from '@mantine/core'
-import { ApiError } from '../api/client'
-import { cancel, generate, publish, reject, retry } from '../api/stories'
+import { Alert, Button, Group, Stack, Text, TextInput } from '@mantine/core'
+import { cancel, generate, reject, retry } from '../api/stories'
 import type { ChannelToday, PublicationStatus, PublishInput, StoryDetail } from '../api/types'
+import { tokens } from '../design/tokens'
 import { formatInCity, isPastInCity, toCityIso } from '../lib/cityTime'
+import { usePublish } from './usePublish'
 import { notifyError, notifyOk, useStoryRefresh } from './useStoryActions'
 
 const PUB_LABEL: Record<PublicationStatus, string> = {
@@ -11,7 +12,7 @@ const PUB_LABEL: Record<PublicationStatus, string> = {
   Unknown: 'статус неизвестен', Cancelled: 'отменена',
 }
 const PUB_COLOR: Record<PublicationStatus, string> = {
-  Scheduled: 'blue', Sending: 'blue', Published: 'green', Failed: 'red', Unknown: 'orange', Cancelled: 'gray',
+  Scheduled: 'amber.9', Sending: 'amber.9', Published: 'teal.7', Failed: 'brick.6', Unknown: 'amber.9', Cancelled: 'ink.6',
 }
 
 type Props = {
@@ -23,20 +24,19 @@ type Props = {
   sticky?: boolean
 }
 
-export function PublishPanel({ story, previewTooLong, selectedImageId, tz, today, sticky }: Props) {
+/** The story's action bar: what happened to its publications, today's limit, and the decision buttons. */
+export function PublishPanel({ story, previewTooLong, selectedImageId, tz, today, sticky = true }: Props) {
   const [when, setWhen] = useState('') // 'YYYY-MM-DDTHH:mm' from <input type="datetime-local">
   const [busy, setBusy] = useState(false)
-  const [limitPrompt, setLimitPrompt] = useState<{ input: PublishInput; text: string } | null>(null)
-  const [republish, setRepublish] = useState<PublishInput | null>(null)
   const refresh = useStoryRefresh(story.id)
+  const pub = usePublish(story)
 
   const wall = when ? when.replace('T', ' ') : ''
   const past = wall !== '' && isPastInCity(wall, tz)
   const willExceed = !!today && today.published + today.scheduled + 1 > today.limit
   const canPublish = story.status === 'ReadyForReview' || story.status === 'PublishFailed'
-  // A send that timed out may still have reached the channel: never re-publish without an explicit yes.
-  const unknown = story.publications.some((p) => p.status === 'Unknown')
   const publications = [...story.publications].sort((a, b) => b.id - a.id)
+  const working = busy || pub.busy
 
   async function run(action: () => Promise<unknown>, ok: string) {
     setBusy(true)
@@ -51,32 +51,6 @@ export function PublishPanel({ story, previewTooLong, selectedImageId, tz, today
     }
   }
 
-  function request(input: PublishInput) {
-    if (unknown) setRepublish(input)
-    else void send(input)
-  }
-
-  async function send(input: PublishInput) {
-    setRepublish(null)
-    setBusy(true)
-    try {
-      await publish(story.id, input)
-      notifyOk(input.at ? 'Публикация запланирована' : 'Публикация поставлена в очередь')
-      setLimitPrompt(null)
-      await refresh()
-    } catch (err) {
-      if (err instanceof ApiError && err.code === 'daily_limit_exceeded') {
-        const { published = 0, scheduled = 0, limit = 0 } = err.extra as Record<string, number>
-        setLimitPrompt({
-          input: { ...input, overrideLimit: true },
-          text: `Дневной лимит исчерпан (опубликовано ${published}, запланировано ${scheduled}, лимит ${limit}). Опубликовать всё равно?`,
-        })
-      } else notifyError(err)
-    } finally {
-      setBusy(false)
-    }
-  }
-
   const input = (at?: string): PublishInput => ({
     ...(at ? { at } : {}),
     overrideLimit: false,
@@ -84,93 +58,81 @@ export function PublishPanel({ story, previewTooLong, selectedImageId, tz, today
   })
 
   return (
-    <Paper withBorder p="sm" style={sticky ? { position: 'sticky', bottom: 0, zIndex: 10 } : undefined}>
+    <div style={{
+      ...(sticky ? { position: 'sticky', bottom: 0, zIndex: 10 } : {}),
+      background: tokens.surface, borderTop: `1px solid ${tokens.line}`, padding: '12px 24px',
+    }}>
       <Stack gap="xs">
-        {unknown && (
-          <Alert color="orange" p="xs" title="Пост мог уже выйти">
+        {pub.unknown && (
+          <Alert color="amber" p="xs" title="Пост мог уже выйти">
             Отправка не подтвердилась — проверьте канал вручную, прежде чем публиковать снова.
           </Alert>
         )}
         {publications.length > 0 && (
           <Stack gap={2}>
             {publications.map((p) => (
-              <Text key={p.id} size="xs">
-                <Text span c={PUB_COLOR[p.status]} fw={600} size="xs">{`${p.channelName}: ${PUB_LABEL[p.status]}`}</Text>
-                {` · ${formatInCity(p.publishedAt ?? p.scheduledAt, tz)}`}
-                {p.lastError && <Text span c="red" size="xs">{` · ${p.lastError}`}</Text>}
+              <Text key={p.id} size="sm">
+                <Text span c={PUB_COLOR[p.status]} fw={600} size="sm">{`${p.channelName}: ${PUB_LABEL[p.status]}`}</Text>
+                {`, ${formatInCity(p.publishedAt ?? p.scheduledAt, tz)}`}
+                {p.lastError && <Text span c="brick.6" size="sm">{`. ${p.lastError}`}</Text>}
               </Text>
             ))}
           </Stack>
         )}
-        {today && (
-          <Text size="sm" c={willExceed ? 'orange' : 'dimmed'}>
-            {`Сегодня ${today.published}/${today.limit}` + (today.scheduled ? ` (+${today.scheduled} запланировано)` : '')}
-          </Text>
-        )}
         {canPublish && willExceed && today && (
-          <Alert color="orange" p="xs">{`Дневной лимит будет превышен: ${today.published}/${today.limit} (+${today.scheduled})`}</Alert>
+          <Alert color="amber" p="xs">{`Дневной лимит будет превышен: ${today.published}/${today.limit} (+${today.scheduled})`}</Alert>
         )}
 
-        {canPublish && (
-          <>
-            <Group gap="xs" wrap="wrap">
-              <Button disabled={previewTooLong} loading={busy} onClick={() => request(input())}>Опубликовать сейчас</Button>
+        <Group gap="sm" wrap="wrap" align="flex-start">
+          {today && (
+            <Text size="sm" c="ink.6" style={{ alignSelf: 'center' }}>
+              {'В канале сегодня '}
+              <Text span className="nf-num" fw={600} c={willExceed ? 'brick.6' : 'ink.8'}>{`${today.published} из ${today.limit}`}</Text>
+              {today.scheduled ? `, ещё ${today.scheduled} в плане` : ''}
+            </Text>
+          )}
+          <span style={{ flex: 1 }} />
+
+          {canPublish && (
+            <>
               {story.status === 'ReadyForReview' ? (
-                <Button variant="default" color="red" disabled={busy} onClick={() => run(() => reject(story.id), 'Сюжет отклонён')}>
+                <Button variant="subtle" color="brick" disabled={working} onClick={() => run(() => reject(story.id), 'Сюжет отклонён')}>
                   Отклонить
                 </Button>
               ) : (
-                <Button variant="default" disabled={busy} onClick={() => run(() => cancel(story.id), 'Сюжет возвращён на проверку')}>
+                <Button variant="subtle" color="ink" disabled={working} onClick={() => run(() => cancel(story.id), 'Сюжет возвращён на проверку')}>
                   Вернуть на проверку
                 </Button>
               )}
-            </Group>
-            <Group gap="xs" align="flex-end" wrap="wrap">
-              <TextInput type="datetime-local" label="Дата и время (по городу)" value={when}
-                onChange={(e) => setWhen(e.currentTarget.value)} error={past ? 'Это время уже прошло' : undefined} />
-              <Button variant="light" disabled={!when || past || previewTooLong} loading={busy}
-                onClick={() => request(input(toCityIso(wall, tz)))}>
-                Запланировать
-              </Button>
-            </Group>
-          </>
-        )}
+              <Group gap={6} wrap="nowrap" align="flex-start">
+                <TextInput type="datetime-local" aria-label="Дата и время (по городу)" value={when} w={210}
+                  onChange={(e) => setWhen(e.currentTarget.value)} error={past ? 'Это время уже прошло' : undefined} />
+                <Button variant="default" disabled={!when || past || previewTooLong} loading={working}
+                  onClick={() => pub.request(input(toCityIso(wall, tz)))}>
+                  Запланировать
+                </Button>
+              </Group>
+              <Button disabled={previewTooLong} loading={working} onClick={() => pub.request(input())}>Опубликовать сейчас</Button>
+            </>
+          )}
 
-        {story.status === 'Scheduled' && (
-          <Button color="orange" variant="light" loading={busy} onClick={() => run(() => cancel(story.id), 'Публикация отменена')}>
-            Отменить публикацию
-          </Button>
-        )}
-        {story.status === 'ProcessingFailed' && (
-          <Button loading={busy} onClick={() => run(() => retry(story.id), 'Обработка запущена заново')}>Повторить</Button>
-        )}
-        {story.status === 'LowInterest' && (
-          <Group gap="xs">
-            <Button loading={busy} onClick={() => run(() => generate(story.id), 'Черновик готовится')}>Всё равно сгенерировать</Button>
-            <Button variant="default" color="red" disabled={busy} onClick={() => run(() => reject(story.id), 'Сюжет отклонён')}>Отклонить</Button>
-          </Group>
-        )}
+          {story.status === 'Scheduled' && (
+            <Button color="amber.8" variant="light" loading={working} onClick={() => run(() => cancel(story.id), 'Публикация отменена')}>
+              Отменить публикацию
+            </Button>
+          )}
+          {story.status === 'ProcessingFailed' && (
+            <Button loading={working} onClick={() => run(() => retry(story.id), 'Обработка запущена заново')}>Повторить</Button>
+          )}
+          {story.status === 'LowInterest' && (
+            <>
+              <Button variant="subtle" color="brick" disabled={working} onClick={() => run(() => reject(story.id), 'Сюжет отклонён')}>Отклонить</Button>
+              <Button loading={working} onClick={() => run(() => generate(story.id), 'Черновик готовится')}>Всё равно сгенерировать</Button>
+            </>
+          )}
+        </Group>
       </Stack>
-
-      <Modal opened={republish !== null} onClose={() => setRepublish(null)} title="Опубликовать снова?" centered>
-        <Stack>
-          <Text>Прошлая отправка не подтвердилась, пост мог уже появиться в канале. Вы проверили канал?</Text>
-          <Group justify="flex-end">
-            <Button variant="default" onClick={() => setRepublish(null)}>Отмена</Button>
-            <Button color="orange" loading={busy} onClick={() => republish && send(republish)}>Да, опубликовать снова</Button>
-          </Group>
-        </Stack>
-      </Modal>
-
-      <Modal opened={limitPrompt !== null} onClose={() => setLimitPrompt(null)} title="Дневной лимит" centered>
-        <Stack>
-          <Text>{limitPrompt?.text}</Text>
-          <Group justify="flex-end">
-            <Button variant="default" onClick={() => setLimitPrompt(null)}>Не публиковать</Button>
-            <Button color="orange" loading={busy} onClick={() => limitPrompt && send(limitPrompt.input)}>Опубликовать всё равно</Button>
-          </Group>
-        </Stack>
-      </Modal>
-    </Paper>
+      {pub.dialogs}
+    </div>
   )
 }

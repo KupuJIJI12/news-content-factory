@@ -1,5 +1,5 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest'
-import { screen, waitFor } from '@testing-library/react'
+import { screen, waitFor, within } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
 import { renderWithProviders } from '../test/render'
 import type { StoryListItem, StoryListPage } from '../api/types'
@@ -37,6 +37,15 @@ describe('QueuePage', () => {
     expect(screen.getByText('9')).toBeInTheDocument()
     expect(screen.getAllByText('2 источника').length).toBeGreaterThan(0)
     expect(screen.getByLabelText('Есть обновления')).toBeInTheDocument()
+  })
+
+  it('marks every row with its city, even when only one city exists', async () => {
+    respond({ items: [item(), item({ id: 2, title: 'Второй', cityId: 2, cityName: 'Похвистнево' })], total: 2 })
+    renderWithProviders(<QueuePage />)
+    const rows = await screen.findAllByRole('button', { name: /Без воды|Второй/ })
+    expect(rows).toHaveLength(2)
+    expect(within(rows[0]).getByText('Отрадный')).toBeInTheDocument()
+    expect(within(rows[1]).getByText('Похвистнево')).toBeInTheDocument()
   })
 
   it('switches tab via query string and requests that tab', async () => {

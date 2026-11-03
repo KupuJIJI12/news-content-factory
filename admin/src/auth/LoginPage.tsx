@@ -1,9 +1,10 @@
 import { useState } from 'react'
-import { Alert, Button, Center, Paper, PasswordInput, Stack, TextInput, Title } from '@mantine/core'
+import { Alert, Button, Center, Paper, PasswordInput, Stack, TextInput } from '@mantine/core'
 import { useQueryClient } from '@tanstack/react-query'
 import { useNavigate, useSearchParams } from 'react-router'
 import { ApiError } from '../api/client'
 import { login, meKey } from '../api/auth'
+import { Logo } from '../design/Logo'
 
 export function LoginPage() {
   const [user, setUser] = useState('')
@@ -34,11 +35,11 @@ export function LoginPage() {
 
   return (
     <Center mih="100dvh" p="md">
-      <Paper withBorder shadow="sm" p="xl" w="100%" maw={380}>
+      <Paper p="xl" w="100%" maw={380} style={{ border: '1px solid var(--mantine-color-ink-2)' }}>
         <form onSubmit={submit}>
           <Stack>
-            <Title order={2}>NewsFactory</Title>
-            {error && <Alert color="red">{error}</Alert>}
+            <h1 style={{ margin: '0 0 4px' }}><Logo size={22} /></h1>
+            {error && <Alert color="brick">{error}</Alert>}
             <TextInput label="Логин" value={user} onChange={(e) => setUser(e.currentTarget.value)} autoComplete="username" required />
             <PasswordInput label="Пароль" value={password} onChange={(e) => setPassword(e.currentTarget.value)}
               autoComplete="current-password" required />

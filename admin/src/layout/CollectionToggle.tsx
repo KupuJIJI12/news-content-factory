@@ -7,7 +7,7 @@ import { setCollectionPaused } from '../api/collection'
 import { countersKey } from '../api/counters'
 
 /** "Freeze" switch for scheduled news collection; pausing asks first, resuming does not. */
-export function CollectionToggle({ paused }: { paused: boolean }) {
+export function CollectionToggle({ paused, compact = false }: { paused: boolean; compact?: boolean }) {
   const queryClient = useQueryClient()
   const [confirm, setConfirm] = useState(false)
   const [busy, setBusy] = useState(false)
@@ -28,7 +28,8 @@ export function CollectionToggle({ paused }: { paused: boolean }) {
 
   return (
     <>
-      <Switch label="Сбор новостей" checked={!paused} disabled={busy} color="green" size="sm"
+      <Switch label={compact ? undefined : 'Сбор новостей'} aria-label={compact ? 'Сбор новостей' : undefined}
+        checked={!paused} disabled={busy} color="teal" size="sm"
         onChange={() => (paused ? apply(false) : setConfirm(true))} />
       <Modal opened={confirm} onClose={() => setConfirm(false)} title="Поставить сбор на паузу?" centered>
         <Stack>
@@ -38,7 +39,7 @@ export function CollectionToggle({ paused }: { paused: boolean }) {
           </Text>
           <Group justify="flex-end">
             <Button variant="default" onClick={() => setConfirm(false)}>Отмена</Button>
-            <Button color="orange" onClick={() => apply(true)}>Поставить на паузу</Button>
+            <Button color="amber.8" onClick={() => apply(true)}>Поставить на паузу</Button>
           </Group>
         </Stack>
       </Modal>

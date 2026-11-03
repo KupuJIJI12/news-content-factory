@@ -1,5 +1,5 @@
 import { CityFilter } from '../lib/CityFilter'
-import { useCities } from '../lib/useCities'
+import { CityTag } from '../design/CityTag'
 import { useState } from 'react'
 import { useQuery } from '@tanstack/react-query'
 import { useMediaQuery } from '@mantine/hooks'
@@ -13,20 +13,19 @@ import { SourceForm } from './SourceForm'
 const TYPE_LABEL = { Rss: 'RSS', Html: 'HTML', Vk: 'VK' } as const
 
 function Health({ s }: { s: SourceDto }) {
-  if (!s.isEnabled) return <Badge color="gray" variant="light">выключен</Badge>
-  if (s.health === 'Failing') return <Badge color="red" variant="light">{`Ошибки подряд: ${s.consecutiveFailures}`}</Badge>
-  if (s.health === 'Silent') return <Badge color="yellow" variant="light">Нет новостей дольше ожидаемого</Badge>
-  return <Badge color="green" variant="light">в порядке</Badge>
+  if (!s.isEnabled) return <Badge color="ink" variant="light">выключен</Badge>
+  if (s.health === 'Failing') return <Badge color="brick" variant="light">{`Ошибки подряд: ${s.consecutiveFailures}`}</Badge>
+  if (s.health === 'Silent') return <Badge color="amber" variant="light">Нет новостей дольше ожидаемого</Badge>
+  return <Badge color="teal" variant="light">в порядке</Badge>
 }
 
 export function SourcesPage() {
   const tz = useCityTimeZone()
   const mobile = useMediaQuery('(max-width: 48em)')
   const [cityId, setCityId] = useState<number | null>(null)
-  const { multi } = useCities()
   const { data, isLoading, error } = useQuery({ queryKey: [...sourcesKey, cityId], queryFn: () => listSources(cityId) })
-  const cityBadges = (s: SourceDto) => multi && s.cities.map((c) => (
-    <Badge key={c.cityId} size="xs" variant="outline" color="gray">{c.cityName}</Badge>
+  const cityBadges = (s: SourceDto) => s.cities.map((c) => (
+    <CityTag key={c.cityId} name={c.cityName} />
   ))
   const [editing, setEditing] = useState<SourceDto | null | 'new'>(null)
   const when = (iso: string | null) => (iso ? formatInCity(iso, tz) : '—')
