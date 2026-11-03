@@ -1,15 +1,18 @@
-import { Center, Loader, Pagination, Stack, Tabs, Text, Tooltip } from '@mantine/core'
-import { IconBell } from '@tabler/icons-react'
-import { useQuery } from '@tanstack/react-query'
+import { useState } from 'react'
+import { ActionIcon, Center, Loader, Pagination, Stack, Tabs, Text, Tooltip } from '@mantine/core'
+import { IconBell, IconTrash } from '@tabler/icons-react'
+import { useQuery, useQueryClient } from '@tanstack/react-query'
 import { Link, useSearchParams } from 'react-router'
-import { listStories, PAGE_SIZE, storiesKey, storyCounts, storyCountsKey } from '../api/stories'
+import { deleteStory, listStories, PAGE_SIZE, storiesKey, storyCounts, storyCountsKey } from '../api/stories'
 import type { QueueTab, StoryListItem } from '../api/types'
 import { CityTag } from '../design/CityTag'
+import { ConfirmDelete } from '../design/ConfirmDelete'
 import { ScoreNumber, ScoreRail } from '../design/ScoreRail'
 import { tokens } from '../design/tokens'
 import { CityFilter } from '../lib/CityFilter'
 import { formatInCity } from '../lib/cityTime'
 import { plural } from '../lib/format'
+import { notifyError, notifyOk } from '../story/useStoryActions'
 
 const TABS: { value: QueueTab; label: string }[] = [
   { value: 'Review', label: 'На проверке' },
@@ -35,6 +38,24 @@ export function QueuePage() {
   const setQuery = (next: Record<string, string>) => setParams({ ...(cityId ? { city: String(cityId) } : {}), ...next })
 
   const items = query.data?.items ?? []
+  const queryClient = useQueryClient()
+  const [toDelete, setToDelete] = useState<StoryListItem | null>(null)
+  const [deleting, setDeleting] = useState(false)
+  const canDelete = tab === 'Rejected'
+
+  async function remove(s: StoryListItem) {
+    setDeleting(true)
+    try {
+      await deleteStory(s.id)
+      notifyOk('Сюжет удалён')
+      setToDelete(null)
+      await queryClient.invalidateQueries({ queryKey: ['stories'] }) // the list and the tab counts
+    } catch (err) {
+      notifyError(err)
+    } finally {
+      setDeleting(false)
+    }
+  }
   const when = (s: StoryListItem) =>
     formatInCity(tab === 'Scheduled' && s.scheduledAt ? s.scheduledAt : s.updatedAt, s.timeZone)
   const sources = (n: number) => `${n} ${plural(n, 'источник', 'источника', 'источников')}`
@@ -69,30 +90,41 @@ export function QueuePage() {
         ) : (
           <div style={{ background: tokens.surface, border: `1px solid ${tokens.line}`, borderRadius: 8, overflow: 'hidden' }}>
             {items.map((s, i) => (
-              <Link key={s.id} to={`/stories/${s.id}`} className="nf-row" style={{
-                display: 'grid', gridTemplateColumns: '6px 34px minmax(0, 1fr) auto', alignItems: 'center', gap: 14,
-                padding: '14px 16px', textDecoration: 'none', color: 'inherit',
-                borderBottom: i < items.length - 1 ? `1px solid ${tokens.lineSoft}` : 0,
+              <div key={s.id} className="nf-row" style={{
+                display: 'flex', alignItems: 'center', borderBottom: i < items.length - 1 ? `1px solid ${tokens.lineSoft}` : 0,
               }}>
-                <ScoreRail score={s.score} />
-                <ScoreNumber score={s.score} />
-                <span style={{ display: 'flex', flexDirection: 'column', gap: 4, minWidth: 0 }}>
-                  <span style={{ fontWeight: 600, fontSize: 15, lineHeight: 1.35, color: tokens.ink }}>{s.title}</span>
-                  <span style={{ display: 'flex', flexWrap: 'wrap', alignItems: 'center', gap: 8, fontSize: 13, color: tokens.muted }}>
-                    <CityTag name={s.cityName} />
-                    <span>{sources(s.sourcesCount)}</span>
-                    {s.hasUpdates && (
-                      <Tooltip label="Появились новые подробности">
-                        <span style={{ display: 'inline-flex', alignItems: 'center', gap: 4, color: tokens.amberInk }}>
-                          <IconBell size={14} aria-label="Есть обновления" />
-                          новые подробности
-                        </span>
-                      </Tooltip>
-                    )}
+                <Link to={`/stories/${s.id}`} style={{
+                  flex: 1, minWidth: 0, display: 'grid', gridTemplateColumns: '6px 34px minmax(0, 1fr) auto', alignItems: 'center', gap: 14,
+                  padding: '14px 16px', textDecoration: 'none', color: 'inherit',
+                }}>
+                  <ScoreRail score={s.score} />
+                  <ScoreNumber score={s.score} />
+                  <span style={{ display: 'flex', flexDirection: 'column', gap: 4, minWidth: 0 }}>
+                    <span style={{ fontWeight: 600, fontSize: 15, lineHeight: 1.35, color: tokens.ink }}>{s.title}</span>
+                    <span style={{ display: 'flex', flexWrap: 'wrap', alignItems: 'center', gap: 8, fontSize: 13, color: tokens.muted }}>
+                      <CityTag name={s.cityName} />
+                      <span>{sources(s.sourcesCount)}</span>
+                      {s.hasUpdates && (
+                        <Tooltip label="Появились новые подробности">
+                          <span style={{ display: 'inline-flex', alignItems: 'center', gap: 4, color: tokens.amberInk }}>
+                            <IconBell size={14} aria-label="Есть обновления" />
+                            новые подробности
+                          </span>
+                        </Tooltip>
+                      )}
+                    </span>
                   </span>
-                </span>
-                <span style={{ fontSize: 13, color: tokens.muted, whiteSpace: 'nowrap' }}>{when(s)}</span>
-              </Link>
+                  <span style={{ fontSize: 13, color: tokens.muted, whiteSpace: 'nowrap' }}>{when(s)}</span>
+                </Link>
+                {canDelete && (
+                  <Tooltip label="Удалить">
+                    <ActionIcon variant="subtle" color="brick" size="lg" mr={10} aria-label={`Удалить «${s.title}»`}
+                      onClick={() => setToDelete(s)}>
+                      <IconTrash size={18} />
+                    </ActionIcon>
+                  </Tooltip>
+                )}
+              </div>
             ))}
           </div>
         )}
@@ -102,6 +134,9 @@ export function QueuePage() {
             onChange={(p) => setQuery({ tab, page: String(p) })} />
         )}
       </section>
+      <ConfirmDelete opened={toDelete !== null} busy={deleting} onClose={() => setToDelete(null)}
+        onConfirm={() => toDelete && remove(toDelete)} title="Удалить сюжет?"
+        text={`«${toDelete?.title ?? ''}» пропадёт из «Отклонено». Те же новости не вернутся в очередь: собранные статьи остаются в базе, чтобы их не собирать повторно.`} />
     </Stack>
   )
 }

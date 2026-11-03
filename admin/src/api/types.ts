@@ -2,7 +2,7 @@
 
 export type StoryStatus =
   | 'New' | 'Processing' | 'LowInterest' | 'ReadyForReview' | 'Scheduled' | 'Published' | 'Rejected'
-  | 'ProcessingFailed' | 'PublishFailed'
+  | 'ProcessingFailed' | 'PublishFailed' | 'Deleted'
 export type PublicationStatus = 'Scheduled' | 'Sending' | 'Published' | 'Failed' | 'Unknown' | 'Cancelled'
 export type QueueTab = 'Review' | 'LowInterest' | 'Scheduled' | 'Published' | 'Rejected' | 'Errors'
 export type SourceType = 'Rss' | 'Html' | 'Vk'

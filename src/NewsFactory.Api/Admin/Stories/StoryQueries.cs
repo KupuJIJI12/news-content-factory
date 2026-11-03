@@ -60,7 +60,7 @@ public sealed class StoryQueries(NewsFactoryDbContext db)
             .Include(s => s.Images)
             .Include(s => s.RawItems).ThenInclude(r => r.Source)
             .AsSplitQuery()
-            .SingleOrDefaultAsync(s => s.Id == id, ct);
+            .SingleOrDefaultAsync(s => s.Id == id && s.Status != StoryStatus.Deleted, ct);
         if (story is null) return null;
 
         var publications = await db.Publications.Include(p => p.Channel)

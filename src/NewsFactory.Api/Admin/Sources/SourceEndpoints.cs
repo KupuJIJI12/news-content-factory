@@ -13,7 +13,7 @@ public static class SourceEndpoints
         {
             var now = time.GetUtcNow();
             var sources = await db.Sources.Include(s => s.Cities).ThenInclude(c => c.City)
-                .Where(s => cityId == null || s.Cities.Any(c => c.CityId == cityId)).ToListAsync(ct);
+                .Where(s => s.DeletedAt == null && (cityId == null || s.Cities.Any(c => c.CityId == cityId))).ToListAsync(ct);
             return sources.OrderBy(s => s.Name, StringComparer.Ordinal).Select(s => ToDto(s, now)).ToList();
         });
 
@@ -22,17 +22,20 @@ public static class SourceEndpoints
             if (input.Validate() is { Count: > 0 } errors) return Problems.Validation("Проверьте поля источника", errors);
             if (await UnknownCitiesAsync(db, input, ct) is { } unknown) return unknown;
             if (await UrlTakenAsync(db, input, null, ct)) return Problems.Conflict("conflict", "У этого города уже есть источник с таким адресом");
-            var source = new Source();
+            // Re-adding a deleted source restores it, so items it already collected are not collected again.
+            var url = input.Url!.Trim();
+            var source = await db.Sources.Include(s => s.Cities).Where(s => s.DeletedAt != null && s.Url == url)
+                .OrderByDescending(s => s.DeletedAt).FirstOrDefaultAsync(ct) ?? db.Sources.Add(new Source()).Entity;
+            source.DeletedAt = null;
             Apply(source, input);
             SyncCities(source, input);
-            db.Sources.Add(source);
             await db.SaveChangesAsync(ct);
             return Results.Created($"/api/sources/{source.Id}", await DtoAsync(db, source.Id, time.GetUtcNow(), ct));
         });
 
         api.MapPut("/sources/{id:long}", async (long id, SourceInput input, NewsFactoryDbContext db, TimeProvider time, CancellationToken ct) =>
         {
-            var source = await db.Sources.Include(s => s.Cities).SingleOrDefaultAsync(s => s.Id == id, ct);
+            var source = await db.Sources.Include(s => s.Cities).SingleOrDefaultAsync(s => s.Id == id && s.DeletedAt == null, ct);
             if (source is null) return Problems.NotFound("Источник");
             if (input.Validate() is { Count: > 0 } errors) return Problems.Validation("Проверьте поля источника", errors);
             if (await UnknownCitiesAsync(db, input, ct) is { } unknown) return unknown;
@@ -42,6 +45,16 @@ public static class SourceEndpoints
             SyncCities(source, input);
             await db.SaveChangesAsync(ct);
             return Results.Ok(await DtoAsync(db, id, time.GetUtcNow(), ct));
+        });
+
+        api.MapDelete("/sources/{id:long}", async (long id, NewsFactoryDbContext db, TimeProvider time, CancellationToken ct) =>
+        {
+            var source = await db.Sources.SingleOrDefaultAsync(s => s.Id == id && s.DeletedAt == null, ct);
+            if (source is null) return Problems.NotFound("Источник");
+            source.DeletedAt = time.GetUtcNow();
+            source.IsEnabled = false;
+            await db.SaveChangesAsync(ct);
+            return Results.NoContent();
         });
 
         api.MapPost("/sources/autodetect", async (AutoSetupRequest r, SourceAutoSetup setup, CancellationToken ct) =>
@@ -85,7 +98,7 @@ public static class SourceEndpoints
     {
         var url = input.Url!.Trim();
         var cityId = input.Cities![0].CityId;
-        return db.Sources.AnyAsync(s => s.Url == url && s.Id != exceptId && s.Cities.Any(c => c.CityId == cityId), ct);
+        return db.Sources.AnyAsync(s => s.Url == url && s.Id != exceptId && s.DeletedAt == null && s.Cities.Any(c => c.CityId == cityId), ct);
     }
 
     private static async Task<IResult?> UnknownCitiesAsync(NewsFactoryDbContext db, SourceInput input, CancellationToken ct)

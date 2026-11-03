@@ -125,6 +125,32 @@ public class StoryActionsTests(PostgresFixture db)
     }
 
     [Fact]
+    public async Task Delete_marks_rejected_story_deleted_and_hides_it()
+    {
+        var (host, id) = await StartWithStoryAsync(StoryStatus.Rejected);
+        await using var _ = host;
+        Assert.Equal(HttpStatusCode.NoContent, (await host.Client.DeleteAsync($"/api/stories/{id}")).StatusCode);
+        Assert.Equal(StoryStatus.Deleted, await host.WithDbAsync(d => d.Stories.Select(s => s.Status).SingleAsync()));
+        Assert.True(await host.WithDbAsync(d => d.RawItems.AnyAsync(r => r.StoryId == id)), "collected items stay so they are not collected again");
+        Assert.Equal(HttpStatusCode.NotFound, (await host.Client.GetAsync($"/api/stories/{id}")).StatusCode);
+        var rejected = await host.GetJsonAsync<JsonElement>("/api/stories?tab=Rejected");
+        Assert.Equal(0, rejected.GetProperty("total").GetInt32());
+        var counts = await host.GetJsonAsync<JsonElement>("/api/stories/counts");
+        Assert.Equal(0, counts.GetProperty("Rejected").GetInt32());
+    }
+
+    [Theory]
+    [InlineData(StoryStatus.ReadyForReview)]
+    [InlineData(StoryStatus.Published)]
+    public async Task Only_rejected_stories_can_be_deleted(StoryStatus status)
+    {
+        var (host, id) = await StartWithStoryAsync(status);
+        await using var _ = host;
+        Assert.Equal(HttpStatusCode.Conflict, (await host.Client.DeleteAsync($"/api/stories/{id}")).StatusCode);
+        Assert.Equal(status, await host.WithDbAsync(d => d.Stories.Select(s => s.Status).SingleAsync()));
+    }
+
+    [Fact]
     public async Task Publish_now_schedules_publication_by_current_user()
     {
         var (host, id) = await StartWithStoryAsync();

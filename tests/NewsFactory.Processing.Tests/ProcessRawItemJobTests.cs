@@ -162,11 +162,12 @@ public class ProcessRawItemJobTests(PostgresFixture db)
     }
 
     [Fact]
-    public async Task Rejected_and_old_stories_are_not_candidates()
+    public async Task Rejected_deleted_and_old_stories_are_not_candidates()
     {
         var (itemId, _) = await SeedAsync(c => TestData.DedicatedSource(c), extra: (ctx, city) =>
         {
             ctx.Add(TestData.Story(city, StoryStatus.Rejected));
+            ctx.Add(TestData.Story(city, StoryStatus.Deleted));
             var old = TestData.Story(city, StoryStatus.ReadyForReview);
             old.CreatedAt = Now.AddHours(-73);
             ctx.Add(old);
@@ -174,7 +175,7 @@ public class ProcessRawItemJobTests(PostgresFixture db)
         await RunAsync(itemId);
         await using var read = db.CreateContext();
         Assert.DoesNotContain(_llm.Calls, c => c.Task == LlmTask.Clustering);
-        Assert.Equal(3, await read.Stories.CountAsync());
+        Assert.Equal(4, await read.Stories.CountAsync());
     }
 
     [Fact]

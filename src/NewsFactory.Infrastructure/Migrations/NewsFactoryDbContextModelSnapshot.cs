@@ -534,6 +534,9 @@ namespace NewsFactory.Infrastructure.Migrations
                     b.Property<DateTimeOffset>("CreatedAt")
                         .HasColumnType("timestamp with time zone");
 
+                    b.Property<DateTimeOffset?>("DeletedAt")
+                        .HasColumnType("timestamp with time zone");
+
                     b.Property<int?>("ExpectedFrequencyHours")
                         .HasColumnType("integer");
 

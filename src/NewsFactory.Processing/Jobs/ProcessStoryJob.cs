@@ -12,7 +12,7 @@ namespace NewsFactory.Processing.Jobs;
 public sealed class ProcessStoryJob(NewsFactoryDbContext db, ILlmService llm, IPipelineQueue queue)
 {
     private static readonly StoryStatus[] Frozen =
-        [StoryStatus.Rejected, StoryStatus.Scheduled, StoryStatus.Published, StoryStatus.PublishFailed];
+        [StoryStatus.Rejected, StoryStatus.Deleted, StoryStatus.Scheduled, StoryStatus.Published, StoryStatus.PublishFailed];
 
     [DisableConcurrentExecution("process-story:{0}", 600)]
     public async Task RunAsync(long storyId, bool forceDraft, string? hint, CancellationToken ct)

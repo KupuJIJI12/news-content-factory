@@ -7,7 +7,7 @@ import * as stories from '../api/stories'
 import * as cities from '../api/cities'
 import { QueuePage } from './QueuePage'
 
-vi.mock('../api/stories', async (o) => ({ ...(await o<typeof stories>()), listStories: vi.fn(), storyCounts: vi.fn() }))
+vi.mock('../api/stories', async (o) => ({ ...(await o<typeof stories>()), listStories: vi.fn(), storyCounts: vi.fn(), deleteStory: vi.fn() }))
 vi.mock('../api/auth', () => ({ useMe: () => ({ data: { id: 1, login: 'admin', timeZone: 'Europe/Samara' } }) }))
 vi.mock('../api/cities', async (o) => ({ ...(await o<typeof cities>()), listCities: vi.fn() }))
 
@@ -45,6 +45,23 @@ describe('QueuePage', () => {
     expect(await screen.findByRole('link', { name: /Без воды/ })).toHaveAttribute('href', '/stories/1')
     expect(screen.getByRole('link', { name: /Второй/ })).toHaveAttribute('href', '/stories/2')
     expect(screen.queryByRole('complementary', { name: 'Выбранный сюжет' })).not.toBeInTheDocument()
+  })
+
+  it('rejected tab lets you delete a story after confirmation', async () => {
+    vi.mocked(stories.deleteStory).mockImplementation(async () => undefined)
+    respond({ items: [item({ status: 'Rejected', title: 'Ненужная' })], total: 1 })
+    renderWithProviders(<QueuePage />, { route: '/?tab=Rejected' })
+    await userEvent.click(await screen.findByRole('button', { name: 'Удалить «Ненужная»' }))
+    expect(stories.deleteStory).not.toHaveBeenCalled()
+    await userEvent.click(await screen.findByRole('button', { name: 'Удалить' }))
+    await waitFor(() => expect(stories.deleteStory).toHaveBeenCalledWith(1))
+  })
+
+  it('other tabs have no delete button', async () => {
+    respond({ items: [item()], total: 1 })
+    renderWithProviders(<QueuePage />)
+    await screen.findByText('Без воды 15 ноября')
+    expect(screen.queryByRole('button', { name: /^Удалить/ })).not.toBeInTheDocument()
   })
 
   it('marks every row with its city, even when only one city exists', async () => {

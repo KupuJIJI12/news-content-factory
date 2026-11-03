@@ -5,11 +5,11 @@ import { renderWithProviders } from '../test/render'
 import { ApiError } from '../api/client'
 import * as api from '../api/sources'
 import * as cities from '../api/cities'
-import type { City } from '../api/types'
+import type { City, SourceDto } from '../api/types'
 import { SourceForm } from './SourceForm'
 
 vi.mock('../api/sources', async (o) => ({
-  ...(await o<typeof api>()), createSource: vi.fn(), updateSource: vi.fn(), testSource: vi.fn(), autodetectSource: vi.fn(),
+  ...(await o<typeof api>()), createSource: vi.fn(), updateSource: vi.fn(), testSource: vi.fn(), autodetectSource: vi.fn(), deleteSource: vi.fn(),
 }))
 vi.mock('../api/auth', () => ({ useMe: () => ({ data: { id: 1, login: 'admin', timeZone: 'Europe/Samara' } }) }))
 vi.mock('../api/cities', async (o) => ({ ...(await o<typeof cities>()), listCities: vi.fn() }))
@@ -120,5 +120,27 @@ describe('SourceForm', () => {
     await userEvent.click(screen.getByRole('button', { name: 'Настроить автоматически' }))
     expect(await screen.findByText(/настройте селекторы вручную/)).toBeInTheDocument()
     expect(screen.getByLabelText(/Страница списка/)).toHaveValue('https://card.example/')
+  })
+
+  it('deletes an existing source after confirmation', async () => {
+    vi.mocked(api.deleteSource).mockImplementation(async () => undefined)
+    const onDeleted = vi.fn()
+    const existing: SourceDto = {
+      id: 7, name: 'Безформата', type: 'Rss', url: 'https://x.example/rss', config: null, pollIntervalMinutes: 60,
+      expectedFrequencyHours: null, photosAllowedWithCredit: false, photoCredit: null, isEnabled: true,
+      cities: [{ cityId: 1, cityName: 'Отрадный', isDedicated: false }], lastRunAt: null, lastSuccessAt: null, lastItemAt: null,
+      consecutiveFailures: 0, lastError: null, health: 'Ok',
+    }
+    renderWithProviders(<SourceForm source={existing} onSaved={() => {}} onDeleted={onDeleted} />)
+    await userEvent.click(screen.getByRole('button', { name: 'Удалить источник' }))
+    expect(api.deleteSource).not.toHaveBeenCalled()
+    await userEvent.click(await screen.findByRole('button', { name: 'Удалить' }))
+    await waitFor(() => expect(api.deleteSource).toHaveBeenCalledWith(7))
+    await waitFor(() => expect(onDeleted).toHaveBeenCalled())
+  })
+
+  it('a new source has no delete button', () => {
+    renderWithProviders(<SourceForm source={null} onSaved={() => {}} />)
+    expect(screen.queryByRole('button', { name: 'Удалить источник' })).not.toBeInTheDocument()
   })
 })

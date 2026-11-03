@@ -21,6 +21,7 @@ export const regenerate = (id: number, hint: string | null) =>
 export const generate = (id: number) => apiFetch<void>(`/api/stories/${id}/generate`, { method: 'POST' })
 export const retry = (id: number) => apiFetch<void>(`/api/stories/${id}/retry`, { method: 'POST' })
 export const reject = (id: number) => apiFetch<void>(`/api/stories/${id}/reject`, { method: 'POST' })
+export const deleteStory = (id: number) => apiFetch<void>(`/api/stories/${id}`, { method: 'DELETE' })
 export const ackUpdates = (id: number) => apiFetch<void>(`/api/stories/${id}/ack-updates`, { method: 'POST' })
 export const publish = (id: number, input: PublishInput) =>
   apiFetch<PublishResponse>(`/api/stories/${id}/publish`, { method: 'POST', json: input })

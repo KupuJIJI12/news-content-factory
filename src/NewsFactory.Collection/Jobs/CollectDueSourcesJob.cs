@@ -10,7 +10,7 @@ public sealed class CollectDueSourcesJob(NewsFactoryDbContext db, ICollectQueue 
     {
         if (await new CollectionPause(db).IsPausedAsync(ct)) return;
         var now = time.GetUtcNow();
-        var sources = await db.Sources.Where(s => s.IsEnabled)
+        var sources = await db.Sources.Where(s => s.IsEnabled && s.DeletedAt == null)
             .Select(s => new { s.Id, s.LastRunAt, s.PollIntervalMinutes })
             .ToListAsync(ct);
         foreach (var s in sources.Where(s => s.LastRunAt is null || s.LastRunAt.Value.AddMinutes(s.PollIntervalMinutes) <= now))

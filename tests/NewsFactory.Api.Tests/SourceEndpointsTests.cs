@@ -187,4 +187,47 @@ public class SourceEndpointsTests(PostgresFixture db)
         var unknownCity = await host.PostJsonAsync("/api/sources", body with { Url = "https://y.example/rss", Cities = [new CityLink(999999, false)] });
         Assert.Equal(HttpStatusCode.BadRequest, unknownCity.StatusCode);
     }
+
+    [Fact]
+    public async Task Delete_hides_source_keeps_its_items_and_stops_collection()
+    {
+        await using var host = await StartAsync();
+        var id = await host.WithDbAsync(async d =>
+        {
+            var s = await d.Sources.SingleAsync(x => x.Url == "https://450media.ru/rss/");
+            d.RawItems.Add(new RawItem { SourceId = s.Id, ExternalId = "https://450media.ru/a", Url = "https://450media.ru/a", Title = "t" });
+            await d.SaveChangesAsync();
+            return s.Id;
+        });
+        Assert.Equal(HttpStatusCode.NoContent, (await host.Client.DeleteAsync($"/api/sources/{id}")).StatusCode);
+
+        var list = await host.GetJsonAsync<List<SourceDto>>("/api/sources");
+        Assert.DoesNotContain(list, s => s.Id == id);
+        var stored = await host.WithDbAsync(d => d.Sources.SingleAsync(s => s.Id == id));
+        Assert.NotNull(stored.DeletedAt);
+        Assert.False(stored.IsEnabled);
+        Assert.Equal(1, await host.WithDbAsync(d => d.RawItems.CountAsync(r => r.SourceId == id)));
+        var cities = await host.GetJsonAsync<List<JsonElement>>("/api/cities");
+        Assert.Equal(6, cities.Single().GetProperty("sourcesCount").GetInt32());
+        Assert.Equal(HttpStatusCode.NotFound, (await host.PutJsonAsync($"/api/sources/{id}",
+            Input(await CityIdAsync(host), url: "https://450media.ru/rss/", type: SourceType.Rss, config: null))).StatusCode);
+        Assert.Equal(HttpStatusCode.NotFound, (await host.Client.DeleteAsync($"/api/sources/{id}")).StatusCode);
+    }
+
+    [Fact]
+    public async Task Adding_a_deleted_url_again_restores_that_source_with_its_history()
+    {
+        await using var host = await StartAsync();
+        var id = await host.WithDbAsync(d => d.Sources.Where(x => x.Url == "https://450media.ru/rss/").Select(x => x.Id).SingleAsync());
+        await host.Client.DeleteAsync($"/api/sources/{id}");
+
+        var resp = await host.PostJsonAsync("/api/sources",
+            Input(await CityIdAsync(host), url: "https://450media.ru/rss/", type: SourceType.Rss, config: null));
+        Assert.Equal(HttpStatusCode.Created, resp.StatusCode);
+        var dto = (await resp.Content.ReadFromJsonAsync<SourceDto>(AdminTestHost.Json))!;
+        Assert.Equal(id, dto.Id);
+        Assert.True(dto.IsEnabled);
+        Assert.Null(await host.WithDbAsync(d => d.Sources.Where(s => s.Id == id).Select(s => s.DeletedAt).SingleAsync()));
+    }
 }
+

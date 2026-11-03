@@ -34,7 +34,7 @@ public sealed class CountersService(NewsFactoryDbContext db, TimeProvider time)
         var withUpdates = await db.Stories.CountAsync(s => s.HasUpdates && UpdateVisible.Contains(s.Status), ct);
 
         var paused = await new CollectionPause(db).IsPausedAsync(ct);
-        var sources = await db.Sources.Where(s => s.IsEnabled).ToListAsync(ct);
+        var sources = await db.Sources.Where(s => s.IsEnabled && s.DeletedAt == null).ToListAsync(ct);
         var health = sources.Select(s => SourceHealth.Evaluate(s, now)).ToList();
         var since = now.AddHours(-24);
         var rawFailed = await db.RawItems.CountAsync(r => r.Status == RawItemStatus.Failed && r.CollectedAt >= since, ct);

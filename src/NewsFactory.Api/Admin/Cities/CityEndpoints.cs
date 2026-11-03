@@ -72,7 +72,7 @@ public static class CityEndpoints
     {
         var cities = await db.Cities.OrderBy(c => c.Id).ToListAsync(ct);
         var channels = await db.Channels.Where(c => c.Platform == Platform.Max).ToListAsync(ct);
-        var sourceCounts = await db.SourceCities.GroupBy(sc => sc.CityId).Select(g => new { g.Key, Count = g.Count() }).ToListAsync(ct);
+        var sourceCounts = await db.SourceCities.Where(sc => sc.Source!.DeletedAt == null).GroupBy(sc => sc.CityId).Select(g => new { g.Key, Count = g.Count() }).ToListAsync(ct);
         return cities.Select(c => new CityDto(c.Id, c.Name, c.Slug, c.TimeZone, c.Keywords, c.ScoreThreshold,
             channels.FirstOrDefault(ch => ch.CityId == c.Id) is { } ch ? ChannelRules.ToDto(ch, c) : null,
             sourceCounts.FirstOrDefault(x => x.Key == c.Id)?.Count ?? 0)).ToList();

@@ -4,8 +4,9 @@ import { useQueryClient } from '@tanstack/react-query'
 import { notifications } from '@mantine/notifications'
 import { ApiError } from '../api/client'
 import { fieldErrors } from '../api/settings'
-import { autodetectSource, createSource, sourcesKey, testSource, updateSource } from '../api/sources'
+import { autodetectSource, createSource, deleteSource, sourcesKey, testSource, updateSource } from '../api/sources'
 import type { AutoSetupResult, HtmlSourceConfig, SourceDto, SourceInput, SourceTestResult as Result, SourceType } from '../api/types'
+import { ConfirmDelete } from '../design/ConfirmDelete'
 import { useCities } from '../lib/useCities'
 import { useCityTimeZone } from '../lib/useCityTimeZone'
 import { SourceTestResult } from './SourceTestResult'
@@ -40,7 +41,7 @@ function buildConfig(type: SourceType, html: Partial<HtmlSourceConfig>, screenNa
   return JSON.stringify(out)
 }
 
-export function SourceForm({ source, onSaved }: { source: SourceDto | null; onSaved: (s: SourceDto) => void }) {
+export function SourceForm({ source, onSaved, onDeleted }: { source: SourceDto | null; onSaved: (s: SourceDto) => void; onDeleted?: () => void }) {
   const tz = useCityTimeZone()
   const queryClient = useQueryClient()
   const [type, setType] = useState<SourceType>(source?.type ?? 'Rss')
@@ -62,7 +63,8 @@ export function SourceForm({ source, onSaved }: { source: SourceDto | null; onSa
   const [html, setHtml] = useState<Partial<HtmlSourceConfig>>(source?.type === 'Html' ? parse<HtmlSourceConfig>(source.config) : {})
   const [screenName, setScreenName] = useState(source?.type === 'Vk' ? (parse<{ screenName: string }>(source.config).screenName ?? '') : '')
   const [errors, setErrors] = useState<Record<string, string>>({})
-  const [busy, setBusy] = useState<'save' | 'test' | 'auto' | null>(null)
+  const [busy, setBusy] = useState<'save' | 'test' | 'auto' | 'delete' | null>(null)
+  const [confirmDelete, setConfirmDelete] = useState(false)
   const [result, setResult] = useState<Result | null>(null)
   const [siteUrl, setSiteUrl] = useState('')
   const [auto, setAuto] = useState<AutoSetupResult | null>(null)
@@ -88,6 +90,22 @@ export function SourceForm({ source, onSaved }: { source: SourceDto | null; onSa
       notifications.show({ color: 'green', message: 'Источник сохранён' })
       await queryClient.invalidateQueries({ queryKey: sourcesKey })
       onSaved(saved)
+    } catch (err) {
+      fail(err)
+    } finally {
+      setBusy(null)
+    }
+  }
+
+  async function remove() {
+    if (!source) return
+    setBusy('delete')
+    try {
+      await deleteSource(source.id)
+      notifications.show({ color: 'green', message: 'Источник удалён' })
+      setConfirmDelete(false)
+      await queryClient.invalidateQueries({ queryKey: sourcesKey })
+      onDeleted?.()
     } catch (err) {
       fail(err)
     } finally {
@@ -221,10 +239,18 @@ export function SourceForm({ source, onSaved }: { source: SourceDto | null; onSa
       <Checkbox label="Включён" checked={enabled} onChange={(e) => setEnabled(e.currentTarget.checked)} />
 
       <Group justify="flex-end">
+        {source && (
+          <Button variant="subtle" color="brick" mr="auto" disabled={busy !== null} onClick={() => setConfirmDelete(true)}>
+            Удалить источник
+          </Button>
+        )}
         <Button variant="default" loading={busy === 'test'} disabled={busy !== null} onClick={test}>Проверить</Button>
         <Button loading={busy === 'save'} disabled={busy !== null} onClick={save}>Сохранить</Button>
       </Group>
       {result && <SourceTestResult result={result} tz={tz} />}
+      <ConfirmDelete opened={confirmDelete} busy={busy === 'delete'} onConfirm={remove} onClose={() => setConfirmDelete(false)}
+        title="Удалить источник?"
+        text={`«${source?.name ?? ''}» пропадёт из списка, и сбор с него прекратится. Уже собранные новости останутся. Если добавить этот адрес снова, источник вернётся с прежней историей.`} />
     </Stack>
   )
 }

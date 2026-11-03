@@ -33,6 +33,7 @@ public sealed class CollectSourceJob(
     public async Task RunAsync(long sourceId, CancellationToken ct)
     {
         var source = await db.Sources.SingleAsync(s => s.Id == sourceId, ct);
+        if (source.DeletedAt is not null) return; // a job queued before the source was deleted
         var now = time.GetUtcNow();
         source.LastRunAt = now;
 

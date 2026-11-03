@@ -41,6 +41,23 @@ public class CollectSourceJobTests(PostgresFixture db)
     }
 
     [Fact]
+    public async Task Deleted_source_is_not_collected_even_if_a_job_was_already_queued()
+    {
+        var id = await SeedSourceAsync();
+        await using (var ctx = db.CreateContext())
+        {
+            var s = await ctx.Sources.SingleAsync();
+            s.DeletedAt = Now;
+            await ctx.SaveChangesAsync();
+        }
+        var called = false;
+        await RunAsync(id, new FakeCollector(SourceType.Rss, _ => { called = true; return [Item("a", Now)]; }));
+        Assert.False(called);
+        await using var read = db.CreateContext();
+        Assert.Equal(0, await read.RawItems.CountAsync());
+    }
+
+    [Fact]
     public async Task New_items_are_saved_once_and_enqueued()
     {
         var id = await SeedSourceAsync();

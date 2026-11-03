@@ -1,7 +1,10 @@
 import { useState } from 'react'
 import { Alert, Button, Group, Stack, Text, TextInput } from '@mantine/core'
-import { cancel, generate, reject, retry } from '../api/stories'
+import { useNavigate } from 'react-router'
+import { useQueryClient } from '@tanstack/react-query'
+import { cancel, deleteStory, generate, reject, retry } from '../api/stories'
 import type { ChannelToday, PublicationStatus, PublishInput, StoryDetail } from '../api/types'
+import { ConfirmDelete } from '../design/ConfirmDelete'
 import { tokens } from '../design/tokens'
 import { formatInCity, isPastInCity, toCityIso } from '../lib/cityTime'
 import { usePublish } from './usePublish'
@@ -30,6 +33,24 @@ export function PublishPanel({ story, previewTooLong, selectedImageId, tz, today
   const [busy, setBusy] = useState(false)
   const refresh = useStoryRefresh(story.id)
   const pub = usePublish(story)
+  const navigate = useNavigate()
+  const queryClient = useQueryClient()
+  const [confirmDelete, setConfirmDelete] = useState(false)
+
+  async function remove() {
+    setBusy(true)
+    try {
+      await deleteStory(story.id)
+      notifyOk('Сюжет удалён')
+      setConfirmDelete(false)
+      await queryClient.invalidateQueries({ queryKey: ['stories'] })
+      navigate('/?tab=Rejected')
+    } catch (err) {
+      notifyError(err)
+    } finally {
+      setBusy(false)
+    }
+  }
 
   const wall = when ? when.replace('T', ' ') : ''
   const past = wall !== '' && isPastInCity(wall, tz)
@@ -124,6 +145,9 @@ export function PublishPanel({ story, previewTooLong, selectedImageId, tz, today
           {story.status === 'ProcessingFailed' && (
             <Button loading={working} onClick={() => run(() => retry(story.id), 'Обработка запущена заново')}>Повторить</Button>
           )}
+          {story.status === 'Rejected' && (
+            <Button variant="subtle" color="brick" loading={working} onClick={() => setConfirmDelete(true)}>Удалить сюжет</Button>
+          )}
           {story.status === 'LowInterest' && (
             <>
               <Button variant="subtle" color="brick" disabled={working} onClick={() => run(() => reject(story.id), 'Сюжет отклонён')}>Отклонить</Button>
@@ -133,6 +157,9 @@ export function PublishPanel({ story, previewTooLong, selectedImageId, tz, today
         </Group>
       </Stack>
       {pub.dialogs}
+      <ConfirmDelete opened={confirmDelete} busy={busy} onClose={() => setConfirmDelete(false)} onConfirm={remove}
+        title="Удалить сюжет?"
+        text="Сюжет пропадёт из «Отклонено». Те же новости не вернутся в очередь: собранные статьи остаются в базе, чтобы их не собирать повторно." />
     </div>
   )
 }

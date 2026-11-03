@@ -19,6 +19,7 @@ public static class StoryStatusRules
         (StoryStatus.Scheduled, StoryStatus.ReadyForReview),
         (StoryStatus.PublishFailed, StoryStatus.Scheduled),
         (StoryStatus.PublishFailed, StoryStatus.ReadyForReview),
+        (StoryStatus.Rejected, StoryStatus.Deleted),
     ];
 
     public static bool CanTransition(StoryStatus from, StoryStatus to) => Allowed.Contains((from, to));

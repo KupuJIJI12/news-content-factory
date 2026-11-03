@@ -52,6 +52,16 @@ public static class StoryEndpoints
             return Results.NoContent();
         }));
 
+        // Soft delete: the story and its collected items stay, otherwise the same news would be collected again as new.
+        api.MapDelete("/stories/{id:long}", (long id, NewsFactoryDbContext db, CancellationToken ct) => Guard(async () =>
+        {
+            if (await db.Stories.SingleOrDefaultAsync(s => s.Id == id && s.Status != StoryStatus.Deleted, ct) is not { } story)
+                return Problems.NotFound("Сюжет");
+            story.TransitionTo(StoryStatus.Deleted);
+            await db.SaveChangesAsync(ct);
+            return Results.NoContent();
+        }));
+
         api.MapPost("/stories/{id:long}/ack-updates", async (long id, NewsFactoryDbContext db, CancellationToken ct) =>
         {
             if (await db.Stories.SingleOrDefaultAsync(s => s.Id == id, ct) is not { } story) return Problems.NotFound("Сюжет");

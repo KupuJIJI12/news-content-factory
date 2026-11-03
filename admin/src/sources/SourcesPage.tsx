@@ -81,7 +81,7 @@ export function SourcesPage() {
       <Drawer opened={editing !== null} onClose={() => setEditing(null)} position="right" size={mobile ? '100%' : 'lg'}
         title={editing === 'new' ? 'Новый источник' : editing ? editing.name : ''}>
         {editing !== null && (
-          <SourceForm key={editing === 'new' ? 'new' : editing.id} source={editing === 'new' ? null : editing} onSaved={() => setEditing(null)} />
+          <SourceForm key={editing === 'new' ? 'new' : editing.id} source={editing === 'new' ? null : editing} onSaved={() => setEditing(null)} onDeleted={() => setEditing(null)} />
         )}
       </Drawer>
     </Stack>

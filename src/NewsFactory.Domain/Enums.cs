@@ -15,6 +15,8 @@ public enum StoryStatus
     Rejected,
     ProcessingFailed,
     PublishFailed,
+    /// <summary>Removed by the moderator from «Отклонено». Kept in the database so its items are not collected again.</summary>
+    Deleted,
 }
 
 public enum Platform { Max }

@@ -8,7 +8,7 @@ import { story } from '../test/fixtures'
 import type { PublicationDto } from '../api/types'
 import { PublishPanel } from './PublishPanel'
 
-vi.mock('../api/stories', async (o) => ({ ...(await o<typeof stories>()), publish: vi.fn(), reject: vi.fn(), cancel: vi.fn() }))
+vi.mock('../api/stories', async (o) => ({ ...(await o<typeof stories>()), publish: vi.fn(), reject: vi.fn(), cancel: vi.fn(), deleteStory: vi.fn() }))
 
 const pub = (over: Partial<PublicationDto> = {}): PublicationDto => ({
   id: 1, channelId: 1, channelName: 'Max', status: 'Failed', scheduledAt: '2030-01-15T05:00:00Z', publishedAt: null,
@@ -58,6 +58,19 @@ describe('PublishPanel', () => {
     renderWithProviders(<PublishPanel story={story()} previewTooLong={false} selectedImageId={null} tz="Europe/Samara" today={today(0, 0)} />)
     fireEvent.change(screen.getByLabelText(/Дата и время/), { target: { value: '2020-01-01T09:00' } })
     expect(screen.getByRole('button', { name: 'Запланировать' })).toBeDisabled()
+  })
+
+  it('rejected story can be deleted after confirmation', async () => {
+    vi.mocked(stories.deleteStory).mockImplementation(async () => undefined)
+    renderWithProviders(<PublishPanel story={story({ status: 'Rejected' })} previewTooLong={false} selectedImageId={null} tz="Europe/Samara" />)
+    await userEvent.click(screen.getByRole('button', { name: 'Удалить сюжет' }))
+    await userEvent.click(await screen.findByRole('button', { name: 'Удалить' }))
+    await waitFor(() => expect(stories.deleteStory).toHaveBeenCalledWith(5))
+  })
+
+  it('only rejected stories offer delete', () => {
+    renderWithProviders(<PublishPanel story={story()} previewTooLong={false} selectedImageId={null} tz="Europe/Samara" />)
+    expect(screen.queryByRole('button', { name: 'Удалить сюжет' })).not.toBeInTheDocument()
   })
 
   it('scheduled story offers only cancel', () => {
