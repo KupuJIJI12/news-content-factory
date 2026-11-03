@@ -52,12 +52,63 @@ public class SourceAutoSetupTests(PostgresFixture db)
         var (host, r) = await RunAsync(new()
         {
             ["https://site.example/"] = """<html><head><link rel="alternate" type="application/rss+xml" href="/rss.xml"></head></html>""",
-            ["https://site.example/rss.xml"] = await File.ReadAllTextAsync("Fixtures/synthetic.xml"),
+            ["https://site.example/rss.xml"] = Feed(DateTimeOffset.UtcNow.AddHours(-3), DateTimeOffset.UtcNow.AddDays(-1)),
         }, "https://site.example/");
         await using var _ = host;
         Assert.True(r.Ok, r.Message);
         Assert.Equal(("Rss", SourceType.Rss, "https://site.example/rss.xml", (string?)null), (r.Method, r.Type, r.Url, r.Config));
         Assert.NotEmpty(r.Items);
+    }
+
+    private static string Feed(params DateTimeOffset[] dates) =>
+        "<?xml version=\"1.0\" encoding=\"utf-8\"?><rss version=\"2.0\"><channel><title>Сайт</title>" + string.Concat(dates.Select((d, i) =>
+            $"<item><title>Новость номер {i} из ленты сайта</title><link>https://site.example/rss-news/{i}.html</link>" +
+            $"<guid>rss-{i}</guid><pubDate>{d.ToString("r", System.Globalization.CultureInfo.InvariantCulture)}</pubDate>" +
+            "<description>Текст новости из ленты.</description></item>")) + "</channel></rss>";
+
+    private static Dictionary<string, string> SiteWithListAndFeed(string feed)
+    {
+        var list = "<html><head><link rel=\"alternate\" type=\"application/rss+xml\" href=\"/rss.xml\"></head><body><div class=\"news\">" +
+            string.Concat(Enumerable.Range(1, 4).Select(i =>
+                $"<div class=\"card\"><span class=\"when\">{Today}</span><a href=\"/news/{i}.html\">Заголовок новости номер {i} про город</a></div>")) +
+            "</div></body></html>";
+        var pages = new Dictionary<string, string> { ["https://site.example/"] = list, ["https://site.example/rss.xml"] = feed };
+        for (var i = 1; i <= 4; i++) pages[$"https://site.example/news/{i}.html"] = Article;
+        return pages;
+    }
+
+    [Fact]
+    public async Task Stale_feed_is_skipped_in_favour_of_the_news_page()
+    {
+        var stale = new DateTimeOffset(2018, 11, 20, 4, 45, 0, TimeSpan.Zero);
+        var (host, r) = await RunAsync(SiteWithListAndFeed(Feed(stale, stale.AddDays(-3))), "https://site.example/");
+        await using var _ = host;
+        Assert.True(r.Ok, r.Message);
+        Assert.Equal(("Heuristic", SourceType.Html), (r.Method, r.Type));
+        Assert.Contains("20.11.2018", r.Message);
+        Assert.Contains("https://site.example/rss.xml", r.Message);
+    }
+
+    [Fact]
+    public async Task Fresh_feed_still_wins_over_the_news_page()
+    {
+        var (host, r) = await RunAsync(SiteWithListAndFeed(Feed(DateTimeOffset.UtcNow.AddDays(-5))), "https://site.example/");
+        await using var _ = host;
+        Assert.Equal(("Rss", SourceType.Rss), (r.Method, r.Type));
+    }
+
+    [Fact]
+    public async Task Stale_feed_and_unreadable_page_fail_instead_of_returning_the_stale_feed()
+    {
+        var stale = new DateTimeOffset(2018, 11, 20, 4, 45, 0, TimeSpan.Zero);
+        var (host, r) = await RunAsync(new()
+        {
+            ["https://site.example/"] = """<html><head><link rel="alternate" type="application/rss+xml" href="/rss.xml"></head><body>пусто</body></html>""",
+            ["https://site.example/rss.xml"] = Feed(stale),
+        }, "https://site.example/", llm => llm.Respond(LlmTask.SourceSetup, _ => new SourceSetupResult("article.none", "a", null, null, null)));
+        await using var _ = host;
+        Assert.False(r.Ok);
+        Assert.Contains("20.11.2018", r.Message);
     }
 
     [Fact]

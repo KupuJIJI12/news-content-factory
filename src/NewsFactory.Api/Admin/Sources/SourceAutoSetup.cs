@@ -18,8 +18,9 @@ public sealed record AutoSetupResult(bool Ok, string? Method, SourceType? Type, 
     IReadOnlyList<SourceTestItem> Items, string Message);
 
 /// <summary>
-/// Sets a source up from a site address: RSS feed if the site has one, else the news list found from the page structure,
-/// else selectors suggested by the LLM. Every HTML result is checked by really collecting with it.
+/// Sets a source up from a site address: RSS feed if the site has a fresh one, else the news list found from the page structure,
+/// else selectors suggested by the LLM. Every HTML result is checked by really collecting with it. A feed whose newest item
+/// is older than <see cref="StaleFeedAge"/> is ignored: some sites keep a forgotten feed (Вестник Отрадного: one item from 2018).
 /// </summary>
 public sealed class SourceAutoSetup(IPageFetcher fetcher, ILlmService llm, TimeProvider time, ILogger<SourceAutoSetup> log)
 {
@@ -27,6 +28,7 @@ public sealed class SourceAutoSetup(IPageFetcher fetcher, ILlmService llm, TimeP
     private const int ArticlesToCheck = 3;
     private const int MinArticleText = 200;
     private const int PreviewLength = 300;
+    public static readonly TimeSpan StaleFeedAge = TimeSpan.FromDays(14);
 
     public async Task<AutoSetupResult> RunAsync(Uri url, CancellationToken ct)
     {
@@ -54,8 +56,15 @@ public sealed class SourceAutoSetup(IPageFetcher fetcher, ILlmService llm, TimeP
             return Fail($"Не удалось открыть страницу: {ex.Message}");
         }
 
+        string? staleFeed = null; // why the site's feed was not used, prepended to the result message
         if (await new FeedDiscovery(fetcher).FindAsync(page.FinalUrl, page.Content, ct) is { } feed)
-            return new AutoSetupResult(true, "Rss", SourceType.Rss, feed.Url, null, Preview(feed.Items), $"Найдена RSS-лента: {feed.Url}");
+        {
+            var newest = feed.Items.Max(i => i.PublishedAt);
+            if (newest is null || newest >= time.GetUtcNow() - StaleFeedAge)
+                return new AutoSetupResult(true, "Rss", SourceType.Rss, feed.Url, null, Preview(feed.Items), $"Найдена RSS-лента: {feed.Url}");
+            staleFeed = $"RSS-лента {feed.Url} заброшена: последняя новость в ней от {newest.Value:dd.MM.yyyy}";
+        }
+        string Say(string message) => staleFeed is null ? message : $"{staleFeed}. {message}";
 
         try
         {
@@ -63,7 +72,7 @@ public sealed class SourceAutoSetup(IPageFetcher fetcher, ILlmService llm, TimeP
             {
                 var check = await CheckAsync(candidate.Config, page, ct);
                 if (check.Items is not null)
-                    return Html("Heuristic", candidate.Config, check.Items, "Список новостей определён по структуре страницы");
+                    return Html("Heuristic", candidate.Config, check.Items, Say("Список новостей определён по структуре страницы"));
             }
         }
         catch (Exception ex) when (!ct.IsCancellationRequested && ex is not OperationCanceledException)
@@ -83,7 +92,7 @@ public sealed class SourceAutoSetup(IPageFetcher fetcher, ILlmService llm, TimeP
             var config = new HtmlSourceConfig(page.FinalUrl.ToString(), answer.ItemSelector.Trim(), answer.LinkSelector.Trim(),
                 Blank(answer.TitleSelector), Blank(answer.DateSelector), Blank(answer.DateFormat));
             var check = await CheckAsync(config, page, ct);
-            if (check.Items is not null) return Html("Llm", config, check.Items, "Селекторы подобраны LLM и проверены");
+            if (check.Items is not null) return Html("Llm", config, check.Items, Say("Селекторы подобраны LLM и проверены"));
             why = $"селекторы LLM не подошли: {check.Problem}";
         }
         catch (Exception ex) when (!ct.IsCancellationRequested && ex is not OperationCanceledException)
@@ -91,7 +100,7 @@ public sealed class SourceAutoSetup(IPageFetcher fetcher, ILlmService llm, TimeP
             log.LogWarning(ex, "LLM не смог настроить источник {Url}", url);
             why = $"LLM не помог: {ex.Message}";
         }
-        return Fail($"Не удалось определить список новостей автоматически ({why}) — настройте селекторы вручную");
+        return Fail(Say($"Не удалось определить список новостей автоматически ({why}) — настройте селекторы вручную"));
     }
 
     /// <summary>Collects with the config like the real job does, but downloads only a few articles.</summary>

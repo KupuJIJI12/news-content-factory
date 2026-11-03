@@ -100,7 +100,7 @@ describe('SourceForm', () => {
     set(/Сайт для автонастройки/, 'https://vestnik.example/news/')
     await userEvent.click(screen.getByRole('button', { name: 'Настроить автоматически' }))
     expect(await screen.findByText('Отключат воду в среду')).toBeInTheDocument()
-    expect(screen.getByText(/Определено по структуре страницы/)).toBeInTheDocument()
+    expect(screen.getByText('Список новостей определён по структуре страницы')).toBeInTheDocument()
     expect(api.autodetectSource).toHaveBeenCalledWith('https://vestnik.example/news/')
 
     await userEvent.click(screen.getByRole('button', { name: 'Сохранить' }))

@@ -22,7 +22,6 @@ const HTML_FIELDS: { key: keyof HtmlSourceConfig; label: string; required?: bool
   { key: 'imageSelector', label: 'Селектор фото статьи' },
 ]
 
-const METHOD_LABEL = { Rss: 'Найдена RSS-лента', Heuristic: 'Определено по структуре страницы', Llm: 'Подобрано LLM' } as const
 
 function parse<T>(json: string | null): Partial<T> {
   if (!json) return {}
@@ -172,7 +171,7 @@ export function SourceForm({ source, onSaved, onDeleted }: { source: SourceDto |
           </Group>
           {auto && (
             <Alert color={auto.ok ? 'green' : 'orange'} p="xs">
-              <Text size="sm">{auto.ok && auto.method ? `${METHOD_LABEL[auto.method]}. ${auto.message}` : auto.message}</Text>
+              <Text size="sm">{auto.message}</Text>
             </Alert>
           )}
         </Stack>
