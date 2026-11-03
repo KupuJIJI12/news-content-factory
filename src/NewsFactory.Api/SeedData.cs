@@ -100,8 +100,21 @@ public static class SeedData
 
         foreach (var task in Enum.GetValues<LlmTask>())
         {
-            if (!await db.PromptTemplates.AnyAsync(p => p.Task == task, ct))
-                db.PromptTemplates.Add(new PromptTemplate { Task = task, Version = 1, Text = DefaultPrompts.Get(task), IsActive = true });
+            var versions = await db.PromptTemplates.Where(p => p.Task == task).ToListAsync(ct);
+            var text = DefaultPrompts.Get(task);
+            if (versions.Count == 0)
+            {
+                db.PromptTemplates.Add(new PromptTemplate { Task = task, Version = 1, Text = text, IsActive = true, IsBuiltIn = true });
+                continue;
+            }
+            // Improved defaults reach installs whose editor kept the shipped prompt; their own versions stay as they are,
+            // and so does a deliberate switch back to an older version.
+            var latest = versions.MaxBy(v => v.Version)!;
+            if (latest is { IsActive: true, IsBuiltIn: true } && SameText(latest.Text, text) is false)
+            {
+                latest.IsActive = false;
+                db.PromptTemplates.Add(new PromptTemplate { Task = task, Version = latest.Version + 1, Text = text, IsActive = true, IsBuiltIn = true });
+            }
         }
 
         if (!await db.AppSettings.AnyAsync(s => s.Key == LlmBudgetGuard.SettingKey, ct))
@@ -124,4 +137,6 @@ public static class SeedData
     }
 
     private static string Json<T>(T value) => JsonSerializer.Serialize(value, JsonSerializerOptions.Web);
+
+    private static bool SameText(string a, string b) => a.ReplaceLineEndings("\n").Trim() == b.ReplaceLineEndings("\n").Trim();
 }

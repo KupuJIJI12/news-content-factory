@@ -130,6 +130,23 @@ public class SourceAutoSetupTests(PostgresFixture db)
     }
 
     [Fact]
+    public async Task Page_setup_finds_article_photos_without_an_image_selector()
+    {
+        var withPhoto = Article.Replace("<head>", "").Replace("<html>",
+            "<html><head><meta property=\"og:image\" content=\"/files/photo-{0}.jpg\"></head>");
+        var list = "<html><body><div class=\"news\">" + string.Concat(Enumerable.Range(1, 4).Select(i =>
+            $"<div class=\"card\"><span class=\"when\">{Today}</span><a href=\"/news/{i}.html\">Заголовок новости номер {i} про город</a></div>")) + "</div></body></html>";
+        var pages = new Dictionary<string, string> { ["https://site.example/news/"] = list };
+        for (var i = 1; i <= 4; i++) pages[$"https://site.example/news/{i}.html"] = withPhoto.Replace("{0}", i.ToString());
+
+        var (host, r) = await RunAsync(pages, "https://site.example/news/");
+        await using var _ = host;
+        Assert.True(r.Ok, r.Message);
+        Assert.All(r.Items, i => Assert.Equal(1, i.ImageCount));
+        Assert.DoesNotContain("imageSelector", r.Config!); // photos come without a selector, so nothing to configure
+    }
+
+    [Fact]
     public async Task Falls_back_to_llm_and_validates()
     {
         // Headlines are too short for the structure heuristic, so the LLM is asked.

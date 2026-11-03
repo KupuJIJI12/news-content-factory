@@ -24,6 +24,7 @@ export interface Counters { onReview: number; withUpdates: number; errors: Error
 export interface StoryListItem {
   id: number; status: StoryStatus; score: number | null; title: string; sourcesCount: number; hasUpdates: boolean
   updatedAt: string; scheduledAt: string | null; cityId: number; cityName: string; timeZone: string
+  sourceNames: string[]
 }
 export interface StoryListPage { items: StoryListItem[]; total: number }
 
@@ -84,8 +85,11 @@ export interface HtmlSourceConfig {
 
 export interface ChannelSettings {
   id: number; name: string; platform: Platform; externalChatId: string; dailyLimit: number; isEnabled: boolean; cityId: number; cityName: string
+  publicName?: string | null; publicUrl?: string | null
 }
-export interface ChannelInput { name: string; externalChatId: string; dailyLimit: number; isEnabled: boolean }
+export interface ChannelInput {
+  name: string; externalChatId: string; dailyLimit: number; isEnabled: boolean; publicName?: string | null; publicUrl?: string | null
+}
 export interface City {
   id: number; name: string; slug: string; timeZone: string; keywords: string[]; scoreThreshold: number
   channel: ChannelSettings | null; sourcesCount: number

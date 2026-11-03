@@ -48,4 +48,23 @@ public class PreviewTests(PostgresFixture db)
         Assert.StartsWith("**Заголовок**", preview.Text);
         Assert.Equal((0L, false), (preview.ChannelId, preview.ChannelConfigured));
     }
+
+    [Fact]
+    public async Task Preview_shows_the_link_of_the_citys_channel()
+    {
+        await db.ResetAsync();
+        await using var host = await AdminTestHost.StartAsync(db);
+        var cityId = await host.WithDbAsync(async d =>
+        {
+            var channel = await d.Channels.SingleAsync();
+            (channel.PublicName, channel.PublicUrl) = ("Отрадный Live", "https://max.ru/otradny");
+            await d.SaveChangesAsync();
+            return channel.CityId;
+        });
+        var resp = await host.PostJsonAsync("/api/preview", new { title = "T", body = "B", hashtags = new[] { "#a" }, cityId });
+        var preview = (await resp.Content.ReadFromJsonAsync<List<PreviewResult>>(AdminTestHost.Json))!.Single();
+        Assert.EndsWith("[Отрадный Live в Max](https://max.ru/otradny)\n\n#a", preview.Text);
+        Assert.Equal(preview.Text.Length, preview.Length);
+    }
 }
+

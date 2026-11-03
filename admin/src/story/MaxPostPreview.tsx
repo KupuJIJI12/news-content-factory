@@ -2,16 +2,21 @@ import { Fragment, type ReactNode } from 'react'
 import { Alert, Box, Image, Text } from '@mantine/core'
 import { tokens } from '../design/tokens'
 
-/** Renders the subset of Max markdown our posts use: **bold**, line breaks, "• " bullets, hashtags. Everything else is text. */
+/**
+ * Renders the subset of Max markdown our posts use: **bold**, [text](https://link), line breaks, "• " bullets, hashtags.
+ * Everything else is text; only http(s) links become links.
+ */
 function renderLine(line: string, key: number): ReactNode {
   const parts: ReactNode[] = []
-  const pattern = /\*\*(.+?)\*\*|(#[\p{L}\p{N}_]+)/gu
+  const pattern = /\*\*(.+?)\*\*|\[([^\]]+)\]\((https?:\/\/[^\s)]+)\)|(#[\p{L}\p{N}_]+)/gu
   let last = 0
   let i = 0
   for (const m of line.matchAll(pattern)) {
     if (m.index! > last) parts.push(line.slice(last, m.index))
     if (m[1] !== undefined) parts.push(<strong key={`b${i++}`}>{m[1]}</strong>)
-    else parts.push(<span key={`h${i++}`} data-hashtag style={{ color: tokens.link }}>{m[2]}</span>)
+    else if (m[2] !== undefined)
+      parts.push(<a key={`l${i++}`} href={m[3]} target="_blank" rel="noreferrer" style={{ color: tokens.link }}>{m[2]}</a>)
+    else parts.push(<span key={`h${i++}`} data-hashtag style={{ color: tokens.link }}>{m[4]}</span>)
     last = m.index! + m[0].length
   }
   if (last < line.length) parts.push(line.slice(last))

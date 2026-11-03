@@ -59,5 +59,18 @@ public class CitiesEndpointsTests(PostgresFixture db)
         Assert.Equal(HttpStatusCode.OK, ok.StatusCode);
         var saved = (await host.GetJsonAsync<List<CityDto>>("/api/cities")).Single(c => c.Id == city.Id).Channel!;
         Assert.Equal(("-42", 3, true, "Кинель — Max", city.Id), (saved.ExternalChatId, saved.DailyLimit, saved.IsEnabled, saved.Name, saved.CityId));
+        Assert.Equal(((string?)null, (string?)null), (saved.PublicName, saved.PublicUrl));
+
+        var badLink = await host.PutJsonAsync($"/api/cities/{city.Id}/channel",
+            new { externalChatId = "-42", dailyLimit = 3, isEnabled = true, publicName = "Кинель Live", publicUrl = "max.ru/kinel" });
+        Assert.Equal(HttpStatusCode.BadRequest, badLink.StatusCode);
+        var noName = await host.PutJsonAsync($"/api/cities/{city.Id}/channel",
+            new { externalChatId = "-42", dailyLimit = 3, isEnabled = true, publicUrl = "https://max.ru/kinel" });
+        Assert.Equal(HttpStatusCode.BadRequest, noName.StatusCode);
+        var withLink = await host.PutJsonAsync($"/api/cities/{city.Id}/channel",
+            new { externalChatId = "-42", dailyLimit = 3, isEnabled = true, publicName = " Кинель Live ", publicUrl = " https://max.ru/kinel " });
+        Assert.Equal(HttpStatusCode.OK, withLink.StatusCode);
+        saved = (await host.GetJsonAsync<List<CityDto>>("/api/cities")).Single(c => c.Id == city.Id).Channel!;
+        Assert.Equal(("Кинель Live", "https://max.ru/kinel"), (saved.PublicName, saved.PublicUrl));
     }
 }

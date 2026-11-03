@@ -41,4 +41,16 @@ public class MaxMarkupConverterTests
     [Fact]
     public void Trailing_hashtags_in_body_stay_when_there_is_no_hashtag_list() =>
         Assert.Equal("**T**\n\nТекст.\n\n#лес", MaxMarkupConverter.Render(new PostContent("T", "Текст.\n\n#лес", [], null)));
+
+    [Fact]
+    public void Channel_link_goes_after_text_and_credit_and_before_hashtags() =>
+        Assert.Equal("**T**\n\nТекст.\n\nФото: x.ru\n\n[Отрадный Live в Max](https://max.ru/otradny)\n\n#лес",
+            MaxMarkupConverter.Render(new PostContent("T", "Текст.", ["#лес"], new PostImage("/a.jpg", "x.ru"),
+                new PostChannelLink("Отрадный Live", "https://max.ru/otradny"))));
+
+    [Fact]
+    public void Square_brackets_in_channel_name_do_not_break_the_link() =>
+        Assert.Contains("[Новости (Отрадный) в Max](https://max.ru/o)",
+            MaxMarkupConverter.Render(new PostContent("T", "B", [], null, new PostChannelLink("Новости [Отрадный]", "https://max.ru/o"))));
 }
+

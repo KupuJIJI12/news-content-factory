@@ -24,6 +24,8 @@ public static class MaxMarkupConverter
         var lines = body.Trim().Split('\n').Select(l => l.StartsWith("- ", StringComparison.Ordinal) ? "• " + l[2..] : l);
         sb.Append(string.Join('\n', lines));
         if (post.Image?.Credit is { Length: > 0 } credit) sb.Append("\n\nФото: ").Append(credit);
+        if (post.ChannelLink is { } link)
+            sb.Append("\n\n[").Append(link.Name.Replace('[', '(').Replace(']', ')')).Append(" в Max](").Append(link.Url).Append(')');
         if (post.Hashtags.Count > 0) sb.Append("\n\n").Append(string.Join(' ', post.Hashtags));
         return sb.ToString();
     }

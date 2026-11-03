@@ -43,10 +43,14 @@ describe('CitiesSettings', () => {
     await userEvent.click(await screen.findByText('Отрадный'))
     expect(await screen.findByText(/канал выключен/i)).toBeInTheDocument()
     fireEvent.change(screen.getByLabelText(/ID чата/), { target: { value: '-100' } })
+    fireEvent.change(screen.getByLabelText(/Название канала в Max/), { target: { value: 'Отрадный Live' } })
+    fireEvent.change(screen.getByLabelText(/Ссылка на канал/), { target: { value: ' https://max.ru/otradny ' } })
     await userEvent.click(screen.getByRole('checkbox', { name: /Публиковать в этот канал/ }))
     await userEvent.click(screen.getByRole('button', { name: 'Сохранить канал' }))
-    await waitFor(() => expect(cities.putCityChannel).toHaveBeenCalledWith(1,
-      { name: 'Отрадный — Max', externalChatId: '-100', dailyLimit: 4, isEnabled: true }))
+    await waitFor(() => expect(cities.putCityChannel).toHaveBeenCalledWith(1, {
+      name: 'Отрадный — Max', externalChatId: '-100', dailyLimit: 4, isEnabled: true,
+      publicName: 'Отрадный Live', publicUrl: 'https://max.ru/otradny',
+    }))
   })
 
   it('keeps an unsaved chat id when the list refetches', async () => {

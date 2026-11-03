@@ -37,6 +37,7 @@ public sealed class StoryQueries(NewsFactoryDbContext db)
             s.Id, s.Status, s.Score, s.Summary, s.HasUpdates, s.UpdatedAt, s.CityId, CityName = s.City!.Name, s.City.TimeZone,
             DraftTitle = s.Drafts.Where(d => d.IsCurrent).Select(d => d.Title).FirstOrDefault(),
             SourcesCount = s.RawItems.Count,
+            SourceNames = s.RawItems.OrderBy(r => r.Id).Select(r => r.Source!.Name).ToList(),
             ScheduledAt = db.Publications.Where(p => p.StoryId == s.Id && p.Status == PublicationStatus.Scheduled)
                 .Min(p => (DateTimeOffset?)p.ScheduledAt),
         });
@@ -49,7 +50,8 @@ public sealed class StoryQueries(NewsFactoryDbContext db)
         var total = await query.CountAsync(ct);
         var rows = await query.Skip(Math.Max(0, skip)).Take(Math.Clamp(take, 1, MaxTake)).ToListAsync(ct);
         return new StoryListPage(rows.Select(r => new StoryListItem(r.Id, r.Status, r.Score, r.DraftTitle ?? r.Summary,
-            r.SourcesCount, r.HasUpdates, r.UpdatedAt, r.ScheduledAt, r.CityId, r.CityName, r.TimeZone)).ToList(), total);
+            r.SourcesCount, r.HasUpdates, r.UpdatedAt, r.ScheduledAt, r.CityId, r.CityName, r.TimeZone,
+            r.SourceNames.Distinct().ToList())).ToList(), total);
     }
 
     public async Task<StoryDetail?> GetAsync(long id, CancellationToken ct)

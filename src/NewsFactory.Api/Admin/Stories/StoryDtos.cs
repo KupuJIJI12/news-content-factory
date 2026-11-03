@@ -4,8 +4,10 @@ namespace NewsFactory.Api.Admin.Stories;
 
 public enum QueueTab { Review, LowInterest, Scheduled, Published, Rejected, Errors }
 
+/// <summary>SourceNames: distinct names of the sources the story's articles came from.</summary>
 public sealed record StoryListItem(long Id, StoryStatus Status, int? Score, string Title, int SourcesCount, bool HasUpdates,
-    DateTimeOffset UpdatedAt, DateTimeOffset? ScheduledAt, long CityId, string CityName, string TimeZone);
+    DateTimeOffset UpdatedAt, DateTimeOffset? ScheduledAt, long CityId, string CityName, string TimeZone,
+    IReadOnlyList<string> SourceNames);
 
 public sealed record StoryListPage(IReadOnlyList<StoryListItem> Items, int Total);
 

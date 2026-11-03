@@ -85,6 +85,12 @@ namespace NewsFactory.Infrastructure.Migrations
                         .IsRequired()
                         .HasColumnType("text");
 
+                    b.Property<string>("PublicName")
+                        .HasColumnType("text");
+
+                    b.Property<string>("PublicUrl")
+                        .HasColumnType("text");
+
                     b.Property<DateTimeOffset>("UpdatedAt")
                         .HasColumnType("timestamp with time zone");
 
@@ -355,6 +361,9 @@ namespace NewsFactory.Infrastructure.Migrations
                         .HasColumnType("timestamp with time zone");
 
                     b.Property<bool>("IsActive")
+                        .HasColumnType("boolean");
+
+                    b.Property<bool>("IsBuiltIn")
                         .HasColumnType("boolean");
 
                     b.Property<string>("Task")

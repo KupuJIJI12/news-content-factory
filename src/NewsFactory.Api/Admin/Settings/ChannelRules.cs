@@ -11,6 +11,11 @@ public static class ChannelRules
         if (nameRequired && string.IsNullOrWhiteSpace(input.Name)) errors["name"] = ["Укажите название канала"];
         if (input.DailyLimit is < 1 or > 20) errors["dailyLimit"] = ["Лимит — от 1 до 20 постов в день"];
         if (input.IsEnabled && string.IsNullOrWhiteSpace(input.ExternalChatId)) errors["externalChatId"] = ["Для включённого канала нужен ID чата"];
+        var url = input.PublicUrl?.Trim();
+        if (!string.IsNullOrEmpty(url) && !(Uri.TryCreate(url, UriKind.Absolute, out var u) && u.Scheme is "https" or "http"))
+            errors["publicUrl"] = ["Нужна полная ссылка, например https://max.ru/имя_канала"];
+        if (!string.IsNullOrEmpty(url) && string.IsNullOrWhiteSpace(input.PublicName))
+            errors["publicName"] = ["Укажите, как канал называется в Max — это текст ссылки"];
         return errors;
     }
 
@@ -20,8 +25,10 @@ public static class ChannelRules
         c.ExternalChatId = input.ExternalChatId?.Trim() ?? "";
         c.DailyLimit = input.DailyLimit;
         c.IsEnabled = input.IsEnabled;
+        c.PublicName = string.IsNullOrWhiteSpace(input.PublicName) ? null : input.PublicName.Trim();
+        c.PublicUrl = string.IsNullOrWhiteSpace(input.PublicUrl) ? null : input.PublicUrl.Trim();
     }
 
     public static ChannelSettingsDto ToDto(Channel c, City city) =>
-        new(c.Id, c.Name, c.Platform, c.ExternalChatId, c.DailyLimit, c.IsEnabled, city.Id, city.Name);
+        new(c.Id, c.Name, c.Platform, c.ExternalChatId, c.DailyLimit, c.IsEnabled, city.Id, city.Name, c.PublicName, c.PublicUrl);
 }

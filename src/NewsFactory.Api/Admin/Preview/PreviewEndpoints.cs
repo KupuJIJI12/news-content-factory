@@ -21,11 +21,14 @@ public static class PreviewEndpoints
                 request.ImageCredit is { Length: > 0 } credit ? new PostImage("", credit) : null);
             var channels = await db.Channels.Where(c => c.IsEnabled && (request.CityId == null || c.CityId == request.CityId))
                 .OrderBy(c => c.Id).ToListAsync(ct);
-            var text = MaxMarkupConverter.Render(post);
-            var tooLong = text.Length > MaxMarkupConverter.MaxLength;
-            if (channels.Count == 0)
-                return [new PreviewResult(0, "Max", Platform.Max, text, text.Length, MaxMarkupConverter.MaxLength, tooLong, ChannelConfigured: false)];
-            return channels.Select(c => new PreviewResult(c.Id, c.Name, c.Platform, text, text.Length, MaxMarkupConverter.MaxLength, tooLong))
-                .ToList();
+            PreviewResult Result(long id, string name, Platform platform, PostContent content, bool configured = true)
+            {
+                var text = MaxMarkupConverter.Render(content);
+                return new PreviewResult(id, name, platform, text, text.Length, MaxMarkupConverter.MaxLength,
+                    text.Length > MaxMarkupConverter.MaxLength, configured);
+            }
+            if (channels.Count == 0) return [Result(0, "Max", Platform.Max, post, configured: false)];
+            // Each channel ends the post with its own link, so the text (and its length) is per channel.
+            return channels.Select(c => Result(c.Id, c.Name, c.Platform, post with { ChannelLink = PostChannelLink.Of(c) })).ToList();
         });
 }

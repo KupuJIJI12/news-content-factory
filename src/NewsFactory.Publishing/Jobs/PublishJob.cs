@@ -44,7 +44,7 @@ public sealed class PublishJob(
 
         var draft = pub.Draft!;
         var content = new PostContent(draft.Title, draft.Body, draft.Hashtags,
-            pub.StoryImage is { } img ? new PostImage(img.LocalPath, img.Credit) : null);
+            pub.StoryImage is { } img ? new PostImage(img.LocalPath, img.Credit) : null, PostChannelLink.Of(pub.Channel!));
         var publisher = publishers.Single(p => p.Platform == pub.Channel!.Platform);
 
         try

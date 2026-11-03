@@ -12,7 +12,7 @@ vi.mock('../api/auth', () => ({ useMe: () => ({ data: { id: 1, login: 'admin', t
 vi.mock('../api/cities', async (o) => ({ ...(await o<typeof cities>()), listCities: vi.fn() }))
 
 const item = (over: Partial<StoryListItem> = {}): StoryListItem => ({
-  id: 1, status: 'ReadyForReview', score: 9, title: 'Без воды 15 ноября', sourcesCount: 2, hasUpdates: false,
+  id: 1, status: 'ReadyForReview', score: 9, title: 'Без воды 15 ноября', sourcesCount: 2, sourceNames: ['Вестник Отрадного', '450media'], hasUpdates: false,
   updatedAt: '2026-10-26T10:00:00Z', scheduledAt: null, cityId: 1, cityName: 'Отрадный', timeZone: 'Europe/Samara', ...over,
 })
 
@@ -35,7 +35,7 @@ describe('QueuePage', () => {
     renderWithProviders(<QueuePage />)
     expect(await screen.findByText('Без воды 15 ноября')).toBeInTheDocument()
     expect(screen.getByText('9')).toBeInTheDocument()
-    expect(screen.getAllByText('2 источника').length).toBeGreaterThan(0)
+    expect(screen.getAllByText('Вестник Отрадного, 450media').length).toBeGreaterThan(0)
     expect(screen.getByLabelText('Есть обновления')).toBeInTheDocument()
   })
 
@@ -55,6 +55,12 @@ describe('QueuePage', () => {
     expect(stories.deleteStory).not.toHaveBeenCalled()
     await userEvent.click(await screen.findByRole('button', { name: 'Удалить' }))
     await waitFor(() => expect(stories.deleteStory).toHaveBeenCalledWith(1))
+  })
+
+  it('names the sources, with a count of the rest beyond two', async () => {
+    respond({ items: [item({ sourceNames: ['Вестник Отрадного', '450media', '63.ru', 'Администрация'], sourcesCount: 5 })], total: 1 })
+    renderWithProviders(<QueuePage />)
+    expect(await screen.findByText('Вестник Отрадного, 450media и ещё 2')).toBeInTheDocument()
   })
 
   it('other tabs have no delete button', async () => {

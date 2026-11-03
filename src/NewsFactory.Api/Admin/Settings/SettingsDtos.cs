@@ -3,9 +3,10 @@ using NewsFactory.Domain;
 namespace NewsFactory.Api.Admin.Settings;
 
 public sealed record ChannelSettingsDto(long Id, string Name, Platform Platform, string ExternalChatId, int DailyLimit, bool IsEnabled,
-    long CityId, string CityName);
+    long CityId, string CityName, string? PublicName = null, string? PublicUrl = null);
 
-public sealed record ChannelSettingsInput(string? Name, string? ExternalChatId, int DailyLimit, bool IsEnabled);
+public sealed record ChannelSettingsInput(string? Name, string? ExternalChatId, int DailyLimit, bool IsEnabled,
+    string? PublicName = null, string? PublicUrl = null);
 
 public sealed record SecretsDto(bool MaxBotToken, bool VkServiceToken, bool GigachatAuthKey, bool YandexApiKey);
 

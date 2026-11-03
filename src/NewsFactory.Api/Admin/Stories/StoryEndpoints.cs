@@ -83,8 +83,12 @@ public static class StoryEndpoints
 
             try
             {
-                MaxMarkupConverter.Convert(new PostContent(draft.Title, draft.Body, draft.Hashtags,
-                    image is null ? null : new PostImage(image.LocalPath, image.Credit)));
+                var post = new PostContent(draft.Title, draft.Body, draft.Hashtags,
+                    image is null ? null : new PostImage(image.LocalPath, image.Credit));
+                // The channel link counts towards the limit too; check with every channel the post will go to.
+                var channels = await db.Channels.Where(c => c.CityId == story.CityId && c.IsEnabled).ToListAsync(ct);
+                MaxMarkupConverter.Convert(post);
+                foreach (var channel in channels) MaxMarkupConverter.Convert(post with { ChannelLink = PostChannelLink.Of(channel) });
             }
             catch (PostTooLongException ex)
             {

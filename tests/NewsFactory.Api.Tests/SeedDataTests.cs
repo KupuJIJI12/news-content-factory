@@ -1,6 +1,7 @@
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Configuration;
 using NewsFactory.Domain;
+using NewsFactory.Llm;
 using NewsFactory.TestSupport;
 
 namespace NewsFactory.Api.Tests;
@@ -33,6 +34,57 @@ public class SeedDataTests(PostgresFixture db)
         Assert.Equal("500000", (await read.AppSettings.SingleAsync(s => s.Key == "DailyTokenBudget")).Value);
         var city = await read.Cities.SingleAsync();
         Assert.Equal(("Отрадный", "Europe/Samara", 6), (city.Name, city.TimeZone, city.ScoreThreshold));
+    }
+
+    private async Task<NewsFactory.Domain.Entities.PromptTemplate> RewritePromptAsync(Action<NewsFactory.Infrastructure.NewsFactoryDbContext> change)
+    {
+        await db.ResetAsync();
+        await using (var ctx = db.CreateContext())
+        {
+            await SeedData.ApplyAsync(ctx, Config(), default);
+            change(ctx);
+            await ctx.SaveChangesAsync();
+        }
+        await using (var ctx = db.CreateContext()) await SeedData.ApplyAsync(ctx, Config(), default);
+        await using var read = db.CreateContext();
+        return await read.PromptTemplates.SingleAsync(p => p.Task == LlmTask.Rewrite && p.IsActive);
+    }
+
+    [Fact]
+    public async Task Untouched_built_in_prompt_is_upgraded_to_the_new_default()
+    {
+        var active = await RewritePromptAsync(ctx =>
+            ctx.PromptTemplates.Single(p => p.Task == LlmTask.Rewrite).Text = "старый встроенный текст {{city}} {{sources}} {{hint}}");
+        Assert.Equal((2, true), (active.Version, active.IsBuiltIn));
+        Assert.Equal(DefaultPrompts.Get(LlmTask.Rewrite), active.Text);
+        await using var read = db.CreateContext();
+        Assert.Equal(1, await read.PromptTemplates.CountAsync(p => p.Task == LlmTask.Rewrite && p.IsActive));
+    }
+
+    [Fact]
+    public async Task Prompt_written_by_the_editor_is_never_replaced()
+    {
+        var active = await RewritePromptAsync(ctx =>
+        {
+            ctx.PromptTemplates.Single(p => p.Task == LlmTask.Rewrite).IsActive = false;
+            ctx.PromptTemplates.Add(new NewsFactory.Domain.Entities.PromptTemplate
+                { Task = LlmTask.Rewrite, Version = 2, Text = "мой промпт {{city}} {{sources}} {{hint}}", IsActive = true });
+        });
+        Assert.Equal((2, "мой промпт {{city}} {{sources}} {{hint}}"), (active.Version, active.Text));
+    }
+
+    [Fact]
+    public async Task Rolling_back_to_an_older_built_in_version_is_respected()
+    {
+        var active = await RewritePromptAsync(ctx =>
+        {
+            ctx.PromptTemplates.Single(p => p.Task == LlmTask.Rewrite).Text = "старый встроенный текст {{city}} {{sources}} {{hint}}";
+            ctx.PromptTemplates.Add(new NewsFactory.Domain.Entities.PromptTemplate
+                { Task = LlmTask.Rewrite, Version = 2, Text = DefaultPrompts.Get(LlmTask.Rewrite), IsActive = false, IsBuiltIn = true });
+        });
+        Assert.Equal(1, active.Version);
+        await using var read = db.CreateContext();
+        Assert.Equal(2, await read.PromptTemplates.CountAsync(p => p.Task == LlmTask.Rewrite));
     }
 
     [Fact]

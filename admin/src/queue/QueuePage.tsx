@@ -58,7 +58,13 @@ export function QueuePage() {
   }
   const when = (s: StoryListItem) =>
     formatInCity(tab === 'Scheduled' && s.scheduledAt ? s.scheduledAt : s.updatedAt, s.timeZone)
-  const sources = (n: number) => `${n} ${plural(n, 'источник', 'источника', 'источников')}`
+  // Who reported it: two names fit on a row, the rest is a count. Older API answers without names fall back to the count.
+  const sources = (s: StoryListItem) => {
+    const names = s.sourceNames ?? []
+    if (names.length === 0) return `${s.sourcesCount} ${plural(s.sourcesCount, 'источник', 'источника', 'источников')}`
+    const rest = names.length - 2
+    return names.slice(0, 2).join(', ') + (rest > 0 ? ` и ещё ${rest}` : '')
+  }
 
   return (
     <Stack gap="md">
@@ -103,7 +109,7 @@ export function QueuePage() {
                     <span style={{ fontWeight: 600, fontSize: 15, lineHeight: 1.35, color: tokens.ink }}>{s.title}</span>
                     <span style={{ display: 'flex', flexWrap: 'wrap', alignItems: 'center', gap: 8, fontSize: 13, color: tokens.muted }}>
                       <CityTag name={s.cityName} />
-                      <span>{sources(s.sourcesCount)}</span>
+                      <span title={(s.sourceNames ?? []).join(', ')}>{sources(s)}</span>
                       {s.hasUpdates && (
                         <Tooltip label="Появились новые подробности">
                           <span style={{ display: 'inline-flex', alignItems: 'center', gap: 4, color: tokens.amberInk }}>

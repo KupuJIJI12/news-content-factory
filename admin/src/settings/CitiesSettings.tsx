@@ -50,10 +50,13 @@ function ChannelForm({ city }: { city: City }) {
   const [chatId, setChatId] = useState(channel?.externalChatId ?? '')
   const [limit, setLimit] = useState(channel?.dailyLimit ?? 4)
   const [enabled, setEnabled] = useState(channel?.isEnabled ?? false)
+  const [publicName, setPublicName] = useState(channel?.publicName ?? '')
+  const [publicUrl, setPublicUrl] = useState(channel?.publicUrl ?? '')
   const { save, errors, busy } = useSave(citiesKey)
   const { data: secrets } = useQuery({ queryKey: ['settings', 'secrets'], queryFn: getSecrets })
   useEffect(() => {
     setChatId(channel?.externalChatId ?? ''); setLimit(channel?.dailyLimit ?? 4); setEnabled(channel?.isEnabled ?? false)
+    setPublicName(channel?.publicName ?? ''); setPublicUrl(channel?.publicUrl ?? '')
   }, [channel])
 
   return (
@@ -65,6 +68,12 @@ function ChannelForm({ city }: { city: City }) {
       <TextInput label="ID чата канала" value={chatId} onChange={(e) => setChatId(e.currentTarget.value)} error={errors.externalChatId}
         description="Числовой ID канала Max, куда бот публикует посты (бот должен быть администратором канала)" />
       <NumberInput label="Постов в день, максимум" min={1} max={20} value={limit} onChange={(v) => setLimit(Number(v) || 1)} error={errors.dailyLimit} />
+      <TextInput label="Название канала в Max" value={publicName} onChange={(e) => setPublicName(e.currentTarget.value)}
+        error={errors.publicName} placeholder="Отрадный Live"
+        description="Как канал называется для подписчиков. В конце каждого поста будет ссылка «<название> в Max»" />
+      <TextInput label="Ссылка на канал" value={publicUrl} onChange={(e) => setPublicUrl(e.currentTarget.value)}
+        error={errors.publicUrl} placeholder="https://max.ru/…"
+        description="Публичная ссылка из профиля канала в Max. Без неё посты выходят без ссылки" />
       <Checkbox label="Публиковать в этот канал" checked={enabled} onChange={(e) => setEnabled(e.currentTarget.checked)} />
       {secrets && (
         <Text size="xs" c={secrets.maxBotToken ? 'dimmed' : 'red'}>
@@ -73,7 +82,10 @@ function ChannelForm({ city }: { city: City }) {
       )}
       <Group justify="flex-end">
         <Button variant="light" loading={busy} onClick={() => save(() => putCityChannel(city.id,
-          { name: channel?.name ?? `${city.name} — Max`, externalChatId: chatId.trim(), dailyLimit: limit, isEnabled: enabled }), 'Канал сохранён')}>
+          {
+            name: channel?.name ?? `${city.name} — Max`, externalChatId: chatId.trim(), dailyLimit: limit, isEnabled: enabled,
+            publicName: publicName.trim() || null, publicUrl: publicUrl.trim() || null,
+          }), 'Канал сохранён')}>
           Сохранить канал
         </Button>
       </Group>

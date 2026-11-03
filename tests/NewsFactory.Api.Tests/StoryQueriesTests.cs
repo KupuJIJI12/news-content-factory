@@ -71,6 +71,7 @@ public class StoryQueriesTests(PostgresFixture db)
         Assert.Equal(["Без черновика", "Семь", "Пять"], page.Items.Select(i => i.Title));
         Assert.Equal([9, 7, 5], page.Items.Select(i => i.Score));
         Assert.All(page.Items, i => Assert.Equal(1, i.SourcesCount));
+        Assert.All(page.Items, i => Assert.Equal(["otradny.org"], i.SourceNames));
     }
 
     [Fact]
