@@ -17,3 +17,7 @@ body {
 @media (prefers-reduced-motion: reduce) {
   * { transition: none !important; animation: none !important; }
 }
+
+/* Queue rows are links to the story page. */
+.nf-row { background: #FFFFFF; }
+.nf-row:hover { background: #F2F5F8; }

@@ -39,10 +39,18 @@ describe('QueuePage', () => {
     expect(screen.getByLabelText('Есть обновления')).toBeInTheDocument()
   })
 
+  it('each row opens its story page, there is no side panel', async () => {
+    respond({ items: [item(), item({ id: 2, title: 'Второй' })], total: 2 })
+    renderWithProviders(<QueuePage />)
+    expect(await screen.findByRole('link', { name: /Без воды/ })).toHaveAttribute('href', '/stories/1')
+    expect(screen.getByRole('link', { name: /Второй/ })).toHaveAttribute('href', '/stories/2')
+    expect(screen.queryByRole('complementary', { name: 'Выбранный сюжет' })).not.toBeInTheDocument()
+  })
+
   it('marks every row with its city, even when only one city exists', async () => {
     respond({ items: [item(), item({ id: 2, title: 'Второй', cityId: 2, cityName: 'Похвистнево' })], total: 2 })
     renderWithProviders(<QueuePage />)
-    const rows = await screen.findAllByRole('button', { name: /Без воды|Второй/ })
+    const rows = await screen.findAllByRole('link', { name: /Без воды|Второй/ })
     expect(rows).toHaveLength(2)
     expect(within(rows[0]).getByText('Отрадный')).toBeInTheDocument()
     expect(within(rows[1]).getByText('Похвистнево')).toBeInTheDocument()

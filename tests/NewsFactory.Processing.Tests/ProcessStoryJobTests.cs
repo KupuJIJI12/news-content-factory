@@ -77,6 +77,20 @@ public class ProcessStoryJobTests(PostgresFixture db)
     }
 
     [Fact]
+    public async Task Hashtags_the_model_appended_to_body_are_removed_from_the_draft_body()
+    {
+        var id = await SeedAsync();
+        Score(8);
+        _llm.Respond(LlmTask.Rewrite, _ => new RewriteResult("Без воды", GoodBody + "\n\n#Отрадный #новости #ЖКХ", ["Отрадный", "#новости", "#ЖКХ"]))
+            .Respond(LlmTask.FactCheck, _ => new FactCheckResult([]));
+        await RunAsync(id);
+        await using var ctx = db.CreateContext();
+        var draft = await ctx.Drafts.SingleAsync();
+        Assert.Equal(GoodBody, draft.Body);
+        Assert.Equal(["#Отрадный", "#новости", "#ЖКХ"], draft.Hashtags);
+    }
+
+    [Fact]
     public async Task Force_draft_ignores_threshold()
     {
         var id = await SeedAsync(StoryStatus.LowInterest);

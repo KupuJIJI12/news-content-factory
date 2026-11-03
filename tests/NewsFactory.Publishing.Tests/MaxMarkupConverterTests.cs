@@ -32,4 +32,13 @@ public class MaxMarkupConverterTests
         var overhead = "**T**\n\n".Length + "\n\n#a".Length;
         Assert.Equal(4000, MaxMarkupConverter.Convert(new PostContent("T", new string('а', 4000 - overhead), ["#a"], null)).Length);
     }
+
+    [Fact]
+    public void Hashtags_already_at_the_end_of_body_are_not_repeated() =>
+        Assert.Equal("**T**\n\nТекст.\n\n#лес #отрадный",
+            MaxMarkupConverter.Render(new PostContent("T", "Текст.\n\n#лес #отрадный", ["#лес", "#отрадный"], null)));
+
+    [Fact]
+    public void Trailing_hashtags_in_body_stay_when_there_is_no_hashtag_list() =>
+        Assert.Equal("**T**\n\nТекст.\n\n#лес", MaxMarkupConverter.Render(new PostContent("T", "Текст.\n\n#лес", [], null)));
 }

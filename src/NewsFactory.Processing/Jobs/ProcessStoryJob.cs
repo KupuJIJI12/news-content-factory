@@ -100,7 +100,7 @@ public sealed class ProcessStoryJob(NewsFactoryDbContext db, ILlmService llm, IP
         {
             Version = story.Drafts.Count == 0 ? 1 : story.Drafts.Max(d => d.Version) + 1,
             Title = rewrite.Title.Trim(),
-            Body = rewrite.Body.Trim(),
+            Body = HashtagText.StripTrailing(rewrite.Body),
             Hashtags = Hashtags.NormalizeAll(rewrite.Hashtags),
             RegenerationHint = hint,
             FactCheckIssues = issues,

@@ -1,4 +1,5 @@
 using System.Text;
+using NewsFactory.Domain;
 
 namespace NewsFactory.Publishing.Max;
 
@@ -18,7 +19,9 @@ public static class MaxMarkupConverter
     {
         var sb = new StringBuilder();
         sb.Append("**").Append(post.Title.Trim()).Append("**\n\n");
-        var lines = post.Body.Trim().Split('\n').Select(l => l.StartsWith("- ", StringComparison.Ordinal) ? "• " + l[2..] : l);
+        // Drafts written before the fix may still end with the hashtags; never print them twice.
+        var body = post.Hashtags.Count > 0 ? HashtagText.StripTrailing(post.Body) : post.Body;
+        var lines = body.Trim().Split('\n').Select(l => l.StartsWith("- ", StringComparison.Ordinal) ? "• " + l[2..] : l);
         sb.Append(string.Join('\n', lines));
         if (post.Image?.Credit is { Length: > 0 } credit) sb.Append("\n\nФото: ").Append(credit);
         if (post.Hashtags.Count > 0) sb.Append("\n\n").Append(string.Join(' ', post.Hashtags));
