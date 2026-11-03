@@ -91,6 +91,21 @@ public class ProcessStoryJobTests(PostgresFixture db)
     }
 
     [Fact]
+    public async Task Draft_is_kept_and_flagged_when_the_fact_check_answer_is_unreadable()
+    {
+        var id = await SeedAsync();
+        Score(8);
+        _llm.Respond(LlmTask.Rewrite, _ => new RewriteResult("Без воды", GoodBody, ["#a", "#b", "#c"]))
+            .Respond<FactCheckResult>(LlmTask.FactCheck, _ => throw new LlmResponseInvalidException(LlmTask.FactCheck, ["Ответ не содержит JSON-объекта"]));
+        await RunAsync(id);
+        await using var ctx = db.CreateContext();
+        var story = await ctx.Stories.Include(s => s.Drafts).SingleAsync();
+        Assert.Equal((StoryStatus.ReadyForReview, (string?)null), (story.Status, story.LastError));
+        var issue = Assert.Single(story.Drafts.Single().FactCheckIssues, i => i.Source == FactCheckIssueSource.Llm);
+        Assert.Contains("вручную", issue.Problem);
+    }
+
+    [Fact]
     public async Task Force_draft_ignores_threshold()
     {
         var id = await SeedAsync(StoryStatus.LowInterest);

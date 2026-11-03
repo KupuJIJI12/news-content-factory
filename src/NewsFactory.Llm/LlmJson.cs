@@ -1,5 +1,6 @@
 using System.Collections;
 using System.ComponentModel.DataAnnotations;
+using System.Text;
 using System.Text.Json;
 using System.Text.Json.Nodes;
 
@@ -63,30 +64,47 @@ public static class LlmJson
         }
     }
 
-    /// <summary>Strips markdown fences and returns the first balanced {...} block, honouring JSON strings.</summary>
+    /// <summary>
+    /// Returns the first {...} block, honouring JSON strings: text around it (markdown fences, comments) is dropped.
+    /// GigaChat sometimes breaks the ending (<c>}])</c> instead of <c>}]}</c>, or stops early): a closing bracket that
+    /// does not belong is skipped, a missing one is added. The result is still parsed and validated as usual,
+    /// so a repair never makes up missing fields.
+    /// </summary>
     private static string? ExtractObject(string raw)
     {
         var start = raw.IndexOf('{');
         if (start < 0) return null;
-        int depth = 0;
+        var sb = new StringBuilder();
+        var open = new Stack<char>();
         var inString = false;
         for (var i = start; i < raw.Length; i++)
         {
             var c = raw[i];
             if (inString)
             {
-                if (c == '\\') i++;
+                sb.Append(c);
+                if (c == '\\' && i + 1 < raw.Length) sb.Append(raw[++i]);
                 else if (c == '"') inString = false;
                 continue;
             }
             switch (c)
             {
-                case '"': inString = true; break;
-                case '{': depth++; break;
-                case '}' when --depth == 0: return raw[start..(i + 1)];
+                case '"': inString = true; sb.Append(c); break;
+                case '{': open.Push('}'); sb.Append(c); break;
+                case '[': open.Push(']'); sb.Append(c); break;
+                case '}' or ']':
+                    if (!open.Contains(c)) continue; // a stray closer, e.g. "]" with no array open
+                    while (open.Peek() != c) sb.Append(open.Pop()); // close what the model forgot inside
+                    sb.Append(open.Pop());
+                    if (open.Count == 0) return sb.ToString();
+                    break;
+                case ')': continue; // never valid outside a string
+                default: sb.Append(c); break;
             }
         }
-        return null;
+        if (inString) sb.Append('"');
+        while (open.Count > 0) sb.Append(open.Pop());
+        return sb.ToString();
     }
 
     private static LlmParseResult<T> Fail<T>(string error) => new(default, [error]);

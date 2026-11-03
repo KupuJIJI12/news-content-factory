@@ -89,11 +89,21 @@ public sealed class ProcessStoryJob(NewsFactoryDbContext db, ILlmService llm, IP
         }, ctx, ct: ct);
 
         var fullText = rewrite.Title + "\n\n" + rewrite.Body;
-        var llmCheck = await llm.CompleteAsync<FactCheckResult>(LlmTask.FactCheck,
-            new Dictionary<string, string> { ["sources"] = sources, ["draft"] = fullText }, ctx, ct: ct);
-
         var issues = DeterministicFactChecker.Check(rewrite.Title + "\n" + rewrite.Body, sources).ToList();
-        issues.AddRange(llmCheck.Issues.Select(i => new FactCheckIssue(i.Claim, i.Problem, FactCheckIssueSource.Llm)));
+        try
+        {
+            var llmCheck = await llm.CompleteAsync<FactCheckResult>(LlmTask.FactCheck,
+                new Dictionary<string, string> { ["sources"] = sources, ["draft"] = fullText }, ctx, ct: ct);
+            issues.AddRange(llmCheck.Issues.Select(i => new FactCheckIssue(i.Claim, i.Problem, FactCheckIssueSource.Llm)));
+        }
+        catch (LlmResponseInvalidException ex)
+        {
+            // An unreadable check must not throw the rewrite away: the editor reviews every draft anyway, so keep it
+            // and say plainly that this one was not checked.
+            issues.Add(new FactCheckIssue("Весь текст",
+                $"Автоматическая проверка фактов не сработала ({string.Join("; ", ex.Errors)}). Сверьте текст с источниками вручную.",
+                FactCheckIssueSource.Llm));
+        }
 
         foreach (var old in story.Drafts) old.IsCurrent = false;
         story.Drafts.Add(new Draft

@@ -26,8 +26,11 @@ public sealed record LlmFactIssue(
     [property: Required(ErrorMessage = "Поле claim обязательно")] string Claim,
     [property: Required(ErrorMessage = "Поле problem обязательно")] string Problem);
 
-public sealed record FactCheckResult(
-    [property: Required(ErrorMessage = "Поле issues обязательно")] LlmFactIssue[] Issues);
+/// <summary>GigaChat answers a bare <c>{}</c> when it finds nothing: a missing list means no issues.</summary>
+public sealed record FactCheckResult(LlmFactIssue[]? Issues)
+{
+    public LlmFactIssue[] Issues { get; init; } = Issues ?? [];
+}
 
 /// <summary>CSS selectors for a news list page suggested by the LLM (validated by actually collecting with them).</summary>
 public sealed record SourceSetupResult(
