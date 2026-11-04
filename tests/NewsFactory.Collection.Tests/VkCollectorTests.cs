@@ -1,5 +1,4 @@
 using System.Net;
-using System.Text.Json;
 using Microsoft.Extensions.Options;
 using NewsFactory.Collection.Vk;
 using NewsFactory.Domain;
@@ -26,15 +25,19 @@ public class VkCollectorTests
         return new VkCollector(new HttpClient(_handler), Options.Create(new VkOptions { ServiceToken = "svc" }));
     }
 
+    // utils.resolveScreenName answers 1051 for some service keys (checked live in November 2026),
+    // while wall.get accepts the short name itself through `domain`.
     [Fact]
-    public async Task Resolves_screen_name_once_and_stores_owner_id()
+    public async Task Without_owner_id_reads_wall_by_domain_and_never_resolves_screen_name()
     {
-        var collector = Collector();
-        var source = new Source { Type = SourceType.Vk, Url = "https://vk.ru/trkotradny", Config = """{"screenName":"trkotradny"}""" };
-        await collector.CollectAsync(source, default);
-        Assert.Equal(-12345, JsonSerializer.Deserialize<VkSourceConfig>(source.Config!, JsonSerializerOptions.Web)!.OwnerId);
-        await collector.CollectAsync(source, default);
-        Assert.Single(_handler.Requests, r => r.RequestUri!.AbsolutePath.EndsWith("utils.resolveScreenName"));
+        var source = new Source { Type = SourceType.Vk, Url = "https://vk.ru/iznanka63", Config = """{"screenName":"iznanka63"}""" };
+        var items = await Collector().CollectAsync(source, default);
+
+        Assert.NotEmpty(items);
+        Assert.DoesNotContain(_handler.Requests, r => r.RequestUri!.AbsolutePath.EndsWith("utils.resolveScreenName"));
+        var q = _handler.Requests.Single().RequestUri!.Query;
+        Assert.Contains("domain=iznanka63", q);
+        Assert.DoesNotContain("owner_id", q);
     }
 
     [Fact]
@@ -69,6 +72,14 @@ public class VkCollectorTests
     {
         var ex = await Assert.ThrowsAsync<VkApiException>(() => Collector("Fixtures/vk/error.json").CollectAsync(SourceWithOwner, default));
         Assert.Equal(5, ex.Code);
+    }
+
+    [Fact]
+    public async Task Api_error_names_the_failed_method()
+    {
+        var ex = await Assert.ThrowsAsync<VkApiException>(() => Collector("Fixtures/vk/error.json").CollectAsync(SourceWithOwner, default));
+        Assert.Equal("wall.get", ex.Method);
+        Assert.Equal("VK API 5 (wall.get): User authorization failed", ex.Message);
     }
 }
 
