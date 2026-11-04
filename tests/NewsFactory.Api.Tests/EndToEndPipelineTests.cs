@@ -85,7 +85,7 @@ public class EndToEndPipelineTests(PostgresFixture db)
         {
             b.UseSetting("ConnectionStrings:Postgres", db.ConnectionString);
             b.UseSetting("MAX_CHANNEL_CHAT_ID", "-100");
-            b.UseSetting("Hangfire:WorkerCount", "1");
+            b.UseSetting("Hangfire:ServerEnabled", "false");
             b.ConfigureServices(s =>
             {
                 s.RemoveAll<IPipelineQueue>();

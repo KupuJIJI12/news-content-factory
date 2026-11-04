@@ -12,7 +12,7 @@ namespace NewsFactory.Processing.Jobs;
 public sealed class ProcessStoryJob(NewsFactoryDbContext db, ILlmService llm, IPipelineQueue queue)
 {
     private static readonly StoryStatus[] Frozen =
-        [StoryStatus.Rejected, StoryStatus.Scheduled, StoryStatus.Published, StoryStatus.PublishFailed];
+        [StoryStatus.Rejected, StoryStatus.Deleted, StoryStatus.Scheduled, StoryStatus.Published, StoryStatus.PublishFailed];
 
     [DisableConcurrentExecution("process-story:{0}", 600)]
     public async Task RunAsync(long storyId, bool forceDraft, string? hint, CancellationToken ct)
@@ -22,13 +22,14 @@ public sealed class ProcessStoryJob(NewsFactoryDbContext db, ILlmService llm, IP
 
         var previous = story.Status;
         if (story.Status != StoryStatus.Processing) story.TransitionTo(StoryStatus.Processing);
+        story.LastError = null; // a new failure writes it again; a successful run must not keep the old one
         await db.SaveChangesAsync(ct);
 
         try
         {
-            await ProcessAsync(story, forceDraft, hint, ct);
+            await ProcessAsync(story, previous, forceDraft, hint, ct);
         }
-        catch (LlmBudgetExceededException ex)
+        catch (LlmPostponedException ex) // budget spent or the provider rate-limits us: try again later, not a failure
         {
             db.ChangeTracker.Clear();
             var fresh = await db.Stories.SingleAsync(s => s.Id == storyId, ct);
@@ -47,7 +48,7 @@ public sealed class ProcessStoryJob(NewsFactoryDbContext db, ILlmService llm, IP
         }
     }
 
-    private async Task ProcessAsync(Story story, bool forceDraft, string? hint, CancellationToken ct)
+    private async Task ProcessAsync(Story story, StoryStatus previous, bool forceDraft, string? hint, CancellationToken ct)
     {
         var city = story.City!;
         var sources = SourceTextBuilder.Build(story.RawItems
@@ -60,6 +61,19 @@ public sealed class ProcessStoryJob(NewsFactoryDbContext db, ILlmService llm, IP
                 new Dictionary<string, string> { ["city"] = city.Name, ["sources"] = sources }, ctx, ct: ct);
             story.Score = score.Score;
             story.ScoreReason = score.Reason;
+        }
+
+        // Automatic re-run (new source joined) must not overwrite what the moderator wrote: only flag updates.
+        var humanDraft = story.Drafts.Any(d => d.IsCurrent && d.AuthorUserId is not null);
+        if (!forceDraft && hint is null && humanDraft)
+        {
+            story.HasUpdates = true;
+            // A retry of a failed run lands back in review: the moderator's text is intact, the failure is over.
+            story.Status = previous is StoryStatus.Processing or StoryStatus.ProcessingFailed or StoryStatus.New
+                ? StoryStatus.ReadyForReview : previous;
+            story.LastError = null;
+            await db.SaveChangesAsync(ct);
+            return;
         }
 
         if (!forceDraft && story.Score is { } s && s < city.ScoreThreshold)
@@ -75,19 +89,29 @@ public sealed class ProcessStoryJob(NewsFactoryDbContext db, ILlmService llm, IP
         }, ctx, ct: ct);
 
         var fullText = rewrite.Title + "\n\n" + rewrite.Body;
-        var llmCheck = await llm.CompleteAsync<FactCheckResult>(LlmTask.FactCheck,
-            new Dictionary<string, string> { ["sources"] = sources, ["draft"] = fullText }, ctx, ct: ct);
-
         var issues = DeterministicFactChecker.Check(rewrite.Title + "\n" + rewrite.Body, sources).ToList();
-        issues.AddRange(llmCheck.Issues.Select(i => new FactCheckIssue(i.Claim, i.Problem, FactCheckIssueSource.Llm)));
+        try
+        {
+            var llmCheck = await llm.CompleteAsync<FactCheckResult>(LlmTask.FactCheck,
+                new Dictionary<string, string> { ["sources"] = sources, ["draft"] = fullText }, ctx, ct: ct);
+            issues.AddRange(llmCheck.Issues.Select(i => new FactCheckIssue(i.Claim, i.Problem, FactCheckIssueSource.Llm)));
+        }
+        catch (LlmResponseInvalidException ex)
+        {
+            // An unreadable check must not throw the rewrite away: the editor reviews every draft anyway, so keep it
+            // and say plainly that this one was not checked.
+            issues.Add(new FactCheckIssue("Весь текст",
+                $"Автоматическая проверка фактов не сработала ({string.Join("; ", ex.Errors)}). Сверьте текст с источниками вручную.",
+                FactCheckIssueSource.Llm));
+        }
 
         foreach (var old in story.Drafts) old.IsCurrent = false;
         story.Drafts.Add(new Draft
         {
             Version = story.Drafts.Count == 0 ? 1 : story.Drafts.Max(d => d.Version) + 1,
             Title = rewrite.Title.Trim(),
-            Body = rewrite.Body.Trim(),
-            Hashtags = rewrite.Hashtags.Select(NormalizeHashtag).Where(h => h.Length > 1).ToList(),
+            Body = HashtagText.StripTrailing(rewrite.Body),
+            Hashtags = Hashtags.NormalizeAll(rewrite.Hashtags),
             RegenerationHint = hint,
             FactCheckIssues = issues,
             IsCurrent = true,
@@ -105,10 +129,4 @@ public sealed class ProcessStoryJob(NewsFactoryDbContext db, ILlmService llm, IP
             .Include(s => s.RawItems).ThenInclude(r => r.Source)
             .AsSplitQuery()
             .SingleAsync(s => s.Id == id, ct);
-
-    private static string NormalizeHashtag(string tag)
-    {
-        var compact = string.Concat(tag.Where(c => !char.IsWhiteSpace(c))).TrimStart('#');
-        return "#" + compact;
-    }
 }

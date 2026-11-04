@@ -1,4 +1,5 @@
 using System.Text;
+using NewsFactory.Domain;
 
 namespace NewsFactory.Publishing.Max;
 
@@ -6,15 +7,26 @@ public static class MaxMarkupConverter
 {
     public const int MaxLength = 4000;
 
+    /// <summary>Same as <see cref="Render"/> but refuses posts longer than <see cref="MaxLength"/>.</summary>
     public static string Convert(PostContent post)
+    {
+        var text = Render(post);
+        return text.Length > MaxLength ? throw new PostTooLongException(text.Length, MaxLength) : text;
+    }
+
+    /// <summary>Max markdown text without the length check (used for previews).</summary>
+    public static string Render(PostContent post)
     {
         var sb = new StringBuilder();
         sb.Append("**").Append(post.Title.Trim()).Append("**\n\n");
-        var lines = post.Body.Trim().Split('\n').Select(l => l.StartsWith("- ", StringComparison.Ordinal) ? "• " + l[2..] : l);
+        // Drafts written before the fix may still end with the hashtags; never print them twice.
+        var body = post.Hashtags.Count > 0 ? HashtagText.StripTrailing(post.Body) : post.Body;
+        var lines = body.Trim().Split('\n').Select(l => l.StartsWith("- ", StringComparison.Ordinal) ? "• " + l[2..] : l);
         sb.Append(string.Join('\n', lines));
         if (post.Image?.Credit is { Length: > 0 } credit) sb.Append("\n\nФото: ").Append(credit);
+        if (post.ChannelLink is { } link)
+            sb.Append("\n\n[").Append(link.Name.Replace('[', '(').Replace(']', ')')).Append(" в Max](").Append(link.Url).Append(')');
         if (post.Hashtags.Count > 0) sb.Append("\n\n").Append(string.Join(' ', post.Hashtags));
-        var text = sb.ToString();
-        return text.Length > MaxLength ? throw new PostTooLongException(text.Length, MaxLength) : text;
+        return sb.ToString();
     }
 }

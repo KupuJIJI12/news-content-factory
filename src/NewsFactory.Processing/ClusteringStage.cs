@@ -15,7 +15,7 @@ public sealed class ClusteringStage(NewsFactoryDbContext db, ILlmService llm, Ti
     {
         var since = time.GetUtcNow() - Window;
         var candidates = await db.Stories
-            .Where(s => s.CityId == city.Id && s.CreatedAt >= since && s.Status != StoryStatus.Rejected)
+            .Where(s => s.CityId == city.Id && s.CreatedAt >= since && s.Status != StoryStatus.Rejected && s.Status != StoryStatus.Deleted)
             .OrderBy(s => s.Id)
             .ToListAsync(ct);
 

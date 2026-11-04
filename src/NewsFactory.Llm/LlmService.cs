@@ -1,6 +1,5 @@
 using System.Diagnostics;
 using System.Text.Json;
-using System.Text.Json.Schema;
 using Microsoft.EntityFrameworkCore;
 using NewsFactory.Domain;
 using NewsFactory.Domain.Entities;
@@ -9,7 +8,8 @@ using NewsFactory.Llm.Clients;
 
 namespace NewsFactory.Llm;
 
-public sealed class LlmService(NewsFactoryDbContext db, IDbContextFactory<NewsFactoryDbContext> logs, ILlmClientResolver clients, LlmBudgetGuard budget) : ILlmService
+public sealed class LlmService(NewsFactoryDbContext db, IDbContextFactory<NewsFactoryDbContext> logs, ILlmClientResolver clients, LlmBudgetGuard budget,
+    LlmThrottle throttle) : ILlmService
 {
     private const int MaxAttempts = 2;
     private static readonly JsonSerializerOptions Json = JsonSerializerOptions.Web;
@@ -26,10 +26,12 @@ public sealed class LlmService(NewsFactoryDbContext db, IDbContextFactory<NewsFa
                        ?? throw new InvalidOperationException($"Нет активного промпта для задачи {task}");
         var client = clients.Resolve(setting.Provider!);
 
-        var schema = JsonSchemaExporter.GetJsonSchemaAsNode(Json, typeof(T));
+        var schema = LlmExample.SchemaFor<T>();
+        var example = LlmExample.FromSchema(schema).ToJsonString(new JsonSerializerOptions { Encoder = System.Text.Encodings.Web.JavaScriptEncoder.UnsafeRelaxedJsonEscaping });
         var messages = new List<ChatMessage>
         {
-            new("system", "Отвечай только JSON-объектом, соответствующим схеме:\n" + schema.ToJsonString()),
+            new("system", "Отвечай только одним JSON-объектом с теми же полями, что в образце, подставив свои значения. " +
+                          "Не присылай схему и не добавляй пояснений. Образец ответа:\n" + example),
             new("user", PromptRenderer.Render(template.Text, vars)),
         };
 
@@ -46,7 +48,8 @@ public sealed class LlmService(NewsFactoryDbContext db, IDbContextFactory<NewsFa
             ChatCompletion completion;
             try
             {
-                completion = await client.CompleteAsync(new ChatRequest(setting.Model, messages.ToList(), setting.Temperature, schema), ct);
+                var request = new ChatRequest(setting.Model, messages.ToList(), setting.Temperature, schema);
+                completion = await throttle.RunAsync(setting.ProviderId, c => client.CompleteAsync(request, c), ct);
             }
             catch (Exception ex)
             {

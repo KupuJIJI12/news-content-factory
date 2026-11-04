@@ -42,14 +42,21 @@ public static class SeedData
         await AddSourceAsync(db, city, "Вестник Отрадного", SourceType.Html, "https://vestnikotradnogo.ru/", null, dedicated: true, 72, false, ct);
         await AddSourceAsync(db, city, "Безформата — Отрадный", SourceType.Html, "https://otradniy.bezformata.com/", null, dedicated: false, 24, false, ct);
 
-        if (!await db.Channels.AnyAsync(c => c.CityId == city.Id && c.Platform == Platform.Max, ct))
+        var chatId = config["MAX_CHANNEL_CHAT_ID"]?.Trim();
+        var maxChannel = await db.Channels.SingleOrDefaultAsync(c => c.CityId == city.Id && c.Platform == Platform.Max, ct);
+        if (maxChannel is null)
         {
-            var chatId = config["MAX_CHANNEL_CHAT_ID"];
             db.Channels.Add(new Channel
             {
                 CityId = city.Id, Platform = Platform.Max, Name = "Отрадный — Max", ExternalChatId = chatId ?? "",
                 DailyLimit = 4, IsEnabled = !string.IsNullOrWhiteSpace(chatId),
             });
+        }
+        else if (string.IsNullOrWhiteSpace(maxChannel.ExternalChatId) && !string.IsNullOrWhiteSpace(chatId))
+        {
+            // The variable was added after the first start: fill the empty channel, never overwrite a value set in the UI.
+            maxChannel.ExternalChatId = chatId;
+            maxChannel.IsEnabled = true;
         }
 
         var folder = config["YANDEX_FOLDER_ID"];
@@ -84,6 +91,7 @@ public static class SeedData
                  {
                      (LlmTask.Relevance, "GigaChat-2", 0.1), (LlmTask.Clustering, "GigaChat-2", 0.1), (LlmTask.Scoring, "GigaChat-2", 0.1),
                      (LlmTask.Rewrite, "GigaChat-2-Max", 0.6), (LlmTask.FactCheck, "GigaChat-2-Pro", 0.1),
+                     (LlmTask.SourceSetup, "GigaChat-2-Pro", 0.1),
                  })
         {
             if (!await db.LlmTaskSettings.AnyAsync(s => s.Task == task, ct))
@@ -92,8 +100,21 @@ public static class SeedData
 
         foreach (var task in Enum.GetValues<LlmTask>())
         {
-            if (!await db.PromptTemplates.AnyAsync(p => p.Task == task, ct))
-                db.PromptTemplates.Add(new PromptTemplate { Task = task, Version = 1, Text = DefaultPrompts.Get(task), IsActive = true });
+            var versions = await db.PromptTemplates.Where(p => p.Task == task).ToListAsync(ct);
+            var text = DefaultPrompts.Get(task);
+            if (versions.Count == 0)
+            {
+                db.PromptTemplates.Add(new PromptTemplate { Task = task, Version = 1, Text = text, IsActive = true, IsBuiltIn = true });
+                continue;
+            }
+            // Improved defaults reach installs whose editor kept the shipped prompt; their own versions stay as they are,
+            // and so does a deliberate switch back to an older version.
+            var latest = versions.MaxBy(v => v.Version)!;
+            if (latest is { IsActive: true, IsBuiltIn: true } && SameText(latest.Text, text) is false)
+            {
+                latest.IsActive = false;
+                db.PromptTemplates.Add(new PromptTemplate { Task = task, Version = latest.Version + 1, Text = text, IsActive = true, IsBuiltIn = true });
+            }
         }
 
         if (!await db.AppSettings.AnyAsync(s => s.Key == LlmBudgetGuard.SettingKey, ct))
@@ -116,4 +137,6 @@ public static class SeedData
     }
 
     private static string Json<T>(T value) => JsonSerializer.Serialize(value, JsonSerializerOptions.Web);
+
+    private static bool SameText(string a, string b) => a.ReplaceLineEndings("\n").Trim() == b.ReplaceLineEndings("\n").Trim();
 }

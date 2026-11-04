@@ -77,6 +77,35 @@ public class ProcessStoryJobTests(PostgresFixture db)
     }
 
     [Fact]
+    public async Task Hashtags_the_model_appended_to_body_are_removed_from_the_draft_body()
+    {
+        var id = await SeedAsync();
+        Score(8);
+        _llm.Respond(LlmTask.Rewrite, _ => new RewriteResult("Без воды", GoodBody + "\n\n#Отрадный #новости #ЖКХ", ["Отрадный", "#новости", "#ЖКХ"]))
+            .Respond(LlmTask.FactCheck, _ => new FactCheckResult([]));
+        await RunAsync(id);
+        await using var ctx = db.CreateContext();
+        var draft = await ctx.Drafts.SingleAsync();
+        Assert.Equal(GoodBody, draft.Body);
+        Assert.Equal(["#Отрадный", "#новости", "#ЖКХ"], draft.Hashtags);
+    }
+
+    [Fact]
+    public async Task Draft_is_kept_and_flagged_when_the_fact_check_answer_is_unreadable()
+    {
+        var id = await SeedAsync();
+        Score(8);
+        _llm.Respond(LlmTask.Rewrite, _ => new RewriteResult("Без воды", GoodBody, ["#a", "#b", "#c"]))
+            .Respond<FactCheckResult>(LlmTask.FactCheck, _ => throw new LlmResponseInvalidException(LlmTask.FactCheck, ["Ответ не содержит JSON-объекта"]));
+        await RunAsync(id);
+        await using var ctx = db.CreateContext();
+        var story = await ctx.Stories.Include(s => s.Drafts).SingleAsync();
+        Assert.Equal((StoryStatus.ReadyForReview, (string?)null), (story.Status, story.LastError));
+        var issue = Assert.Single(story.Drafts.Single().FactCheckIssues, i => i.Source == FactCheckIssueSource.Llm);
+        Assert.Contains("вручную", issue.Problem);
+    }
+
+    [Fact]
     public async Task Force_draft_ignores_threshold()
     {
         var id = await SeedAsync(StoryStatus.LowInterest);
@@ -131,6 +160,19 @@ public class ProcessStoryJobTests(PostgresFixture db)
     }
 
     [Fact]
+    public async Task Rate_limit_postpones_the_story_instead_of_failing_it()
+    {
+        var resumeAt = DateTimeOffset.Parse("2026-11-03T12:10:00Z");
+        var id = await SeedAsync(StoryStatus.New);
+        _llm.Throw(LlmTask.Scoring, new LlmRateLimitedException(resumeAt, new HttpRequestException("429")));
+        await RunAsync(id);
+        await using var ctx = db.CreateContext();
+        var story = await ctx.Stories.SingleAsync();
+        Assert.Equal((StoryStatus.New, (string?)null), (story.Status, story.LastError));
+        Assert.Equal([(id, resumeAt)], _queue.DelayedStories);
+    }
+
+    [Fact]
     public async Task Failure_after_another_run_finished_does_not_throw_or_override_status()
     {
         var id = await SeedAsync();
@@ -146,6 +188,52 @@ public class ProcessStoryJobTests(PostgresFixture db)
         await RunAsync(id);
         await using var ctx = db.CreateContext();
         Assert.Equal(StoryStatus.ReadyForReview, (await ctx.Stories.SingleAsync()).Status);
+    }
+
+    [Fact]
+    public async Task Auto_run_does_not_overwrite_human_draft()
+    {
+        var id = await SeedAsync(StoryStatus.ReadyForReview, s =>
+            s.Drafts.Add(new Draft { Version = 2, Title = "Правка модератора", Body = "b", IsCurrent = true, AuthorUserId = 1 }));
+        Score(3); // even a low score must not move a story the moderator works on
+        Rewrite();
+        await RunAsync(id);
+        await using var ctx = db.CreateContext();
+        var story = await ctx.Stories.Include(s => s.Drafts).SingleAsync();
+        Assert.DoesNotContain(_llm.Calls, c => c.Task == LlmTask.Rewrite);
+        Assert.Equal("Правка модератора", story.Drafts.Single(d => d.IsCurrent).Title);
+        Assert.True(story.HasUpdates);
+        Assert.Equal(StoryStatus.ReadyForReview, story.Status);
+        Assert.Equal(3, story.Score);
+    }
+
+    [Fact]
+    public async Task Retry_of_failed_story_with_human_draft_returns_it_to_review()
+    {
+        var id = await SeedAsync(StoryStatus.ProcessingFailed, s =>
+        {
+            s.LastError = "LLM вернул некорректный JSON";
+            s.Drafts.Add(new Draft { Version = 2, Title = "Правка модератора", Body = "b", IsCurrent = true, AuthorUserId = 1 });
+        });
+        Score(8);
+        Rewrite();
+        await RunAsync(id);
+        await using var ctx = db.CreateContext();
+        var story = await ctx.Stories.Include(s => s.Drafts).SingleAsync();
+        Assert.DoesNotContain(_llm.Calls, c => c.Task == LlmTask.Rewrite);
+        Assert.Equal("Правка модератора", story.Drafts.Single(d => d.IsCurrent).Title);
+        Assert.Equal((StoryStatus.ReadyForReview, (string?)null), (story.Status, story.LastError));
+    }
+
+    [Fact]
+    public async Task Retry_ending_in_low_interest_clears_last_error()
+    {
+        var id = await SeedAsync(StoryStatus.ProcessingFailed, s => s.LastError = "LLM (Scoring) дважды вернула невалидный ответ");
+        Score(2);
+        await RunAsync(id);
+        await using var ctx = db.CreateContext();
+        var story = await ctx.Stories.SingleAsync();
+        Assert.Equal((StoryStatus.LowInterest, (string?)null), (story.Status, story.LastError));
     }
 
     [Fact]

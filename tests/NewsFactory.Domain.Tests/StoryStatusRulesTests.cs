@@ -22,6 +22,7 @@ public class StoryStatusRulesTests
         { StoryStatus.Scheduled, StoryStatus.ReadyForReview },
         { StoryStatus.PublishFailed, StoryStatus.Scheduled },
         { StoryStatus.PublishFailed, StoryStatus.ReadyForReview },
+        { StoryStatus.Rejected, StoryStatus.Deleted },
     };
 
     [Theory, MemberData(nameof(Allowed))]
@@ -33,6 +34,9 @@ public class StoryStatusRulesTests
     [InlineData(StoryStatus.Published, StoryStatus.Processing)]
     [InlineData(StoryStatus.Rejected, StoryStatus.Processing)]
     [InlineData(StoryStatus.LowInterest, StoryStatus.Scheduled)]
+    [InlineData(StoryStatus.ReadyForReview, StoryStatus.Deleted)]
+    [InlineData(StoryStatus.Published, StoryStatus.Deleted)]
+    [InlineData(StoryStatus.Deleted, StoryStatus.Rejected)]
     public void Forbidden_transitions(StoryStatus from, StoryStatus to) =>
         Assert.False(StoryStatusRules.CanTransition(from, to));
 

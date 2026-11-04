@@ -1,0 +1,23 @@
+body {
+  background: #EDF0F3;
+  color: #1C2633;
+}
+
+:focus-visible {
+  outline: 2px solid #1C2633;
+  outline-offset: 2px;
+}
+
+/* Numbers that carry meaning (interest, counts) use the display face. */
+.nf-num {
+  font-family: 'Geologica Variable', 'Golos Text Variable', sans-serif;
+  font-feature-settings: 'tnum';
+}
+
+@media (prefers-reduced-motion: reduce) {
+  * { transition: none !important; animation: none !important; }
+}
+
+/* Queue rows are links to the story page. */
+.nf-row { background: #FFFFFF; }
+.nf-row:hover { background: #F2F5F8; }

@@ -14,3 +14,10 @@ public sealed class PublisherPermanentException(string message, Exception? inner
 
 /// <summary>The send request may have reached the platform; never resend automatically.</summary>
 public sealed class PublisherAmbiguousException(string message, Exception? inner = null) : Exception(message, inner);
+
+/// <summary>The story's city has no enabled channel to publish to.</summary>
+public sealed class NoEnabledChannelException(string cityName)
+    : Exception($"У города {cityName} нет включённого канала — включите его в Настройки → Города")
+{
+    public string CityName { get; } = cityName;
+}

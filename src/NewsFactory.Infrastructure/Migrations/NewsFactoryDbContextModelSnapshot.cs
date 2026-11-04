@@ -85,6 +85,12 @@ namespace NewsFactory.Infrastructure.Migrations
                         .IsRequired()
                         .HasColumnType("text");
 
+                    b.Property<string>("PublicName")
+                        .HasColumnType("text");
+
+                    b.Property<string>("PublicUrl")
+                        .HasColumnType("text");
+
                     b.Property<DateTimeOffset>("UpdatedAt")
                         .HasColumnType("timestamp with time zone");
 
@@ -357,6 +363,9 @@ namespace NewsFactory.Infrastructure.Migrations
                     b.Property<bool>("IsActive")
                         .HasColumnType("boolean");
 
+                    b.Property<bool>("IsBuiltIn")
+                        .HasColumnType("boolean");
+
                     b.Property<string>("Task")
                         .IsRequired()
                         .HasColumnType("text");
@@ -534,6 +543,9 @@ namespace NewsFactory.Infrastructure.Migrations
                     b.Property<DateTimeOffset>("CreatedAt")
                         .HasColumnType("timestamp with time zone");
 
+                    b.Property<DateTimeOffset?>("DeletedAt")
+                        .HasColumnType("timestamp with time zone");
+
                     b.Property<int?>("ExpectedFrequencyHours")
                         .HasColumnType("integer");
 
@@ -578,8 +590,7 @@ namespace NewsFactory.Infrastructure.Migrations
 
                     b.HasKey("Id");
 
-                    b.HasIndex("Url")
-                        .IsUnique();
+                    b.HasIndex("Url");
 
                     b.ToTable("Sources");
                 });

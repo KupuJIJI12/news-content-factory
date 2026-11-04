@@ -16,7 +16,7 @@ internal sealed class SourceConfiguration : IEntityTypeConfiguration<Source>
     {
         b.Property(x => x.Type).HasConversion<string>();
         b.Property(x => x.Config).HasColumnType("jsonb");
-        b.HasIndex(x => x.Url).IsUnique();
+        b.HasIndex(x => x.Url); // unique per city (checked by the API): a regional feed may serve several cities
     }
 }
 

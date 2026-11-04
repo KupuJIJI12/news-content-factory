@@ -162,11 +162,12 @@ public class ProcessRawItemJobTests(PostgresFixture db)
     }
 
     [Fact]
-    public async Task Rejected_and_old_stories_are_not_candidates()
+    public async Task Rejected_deleted_and_old_stories_are_not_candidates()
     {
         var (itemId, _) = await SeedAsync(c => TestData.DedicatedSource(c), extra: (ctx, city) =>
         {
             ctx.Add(TestData.Story(city, StoryStatus.Rejected));
+            ctx.Add(TestData.Story(city, StoryStatus.Deleted));
             var old = TestData.Story(city, StoryStatus.ReadyForReview);
             old.CreatedAt = Now.AddHours(-73);
             ctx.Add(old);
@@ -174,7 +175,7 @@ public class ProcessRawItemJobTests(PostgresFixture db)
         await RunAsync(itemId);
         await using var read = db.CreateContext();
         Assert.DoesNotContain(_llm.Calls, c => c.Task == LlmTask.Clustering);
-        Assert.Equal(3, await read.Stories.CountAsync());
+        Assert.Equal(4, await read.Stories.CountAsync());
     }
 
     [Fact]
@@ -196,6 +197,18 @@ public class ProcessRawItemJobTests(PostgresFixture db)
     {
         var resumeAt = DateTimeOffset.Parse("2026-10-23T20:00:00Z");
         _llm.Throw(LlmTask.Relevance, new LlmBudgetExceededException(resumeAt));
+        var (itemId, _) = await SeedAsync(c => TestData.RegionalSource(c));
+        await RunAsync(itemId);
+        await using var read = db.CreateContext();
+        Assert.Equal([(itemId, resumeAt)], _queue.DelayedRawItems);
+        Assert.Equal(RawItemStatus.New, (await read.RawItems.SingleAsync()).Status);
+    }
+
+    [Fact]
+    public async Task Rate_limit_postpones_the_item_instead_of_failing_it()
+    {
+        var resumeAt = DateTimeOffset.Parse("2026-11-03T12:10:00Z");
+        _llm.Throw(LlmTask.Relevance, new LlmRateLimitedException(resumeAt, new HttpRequestException("429")));
         var (itemId, _) = await SeedAsync(c => TestData.RegionalSource(c));
         await RunAsync(itemId);
         await using var read = db.CreateContext();

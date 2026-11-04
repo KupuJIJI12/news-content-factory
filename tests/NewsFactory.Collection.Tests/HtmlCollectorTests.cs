@@ -114,4 +114,40 @@ public class HtmlCollectorTests
         Assert.NotEmpty(fresh);
         Assert.All(fresh, i => Assert.True(i.Text.Length > 100));
     }
+
+    private static async Task<IReadOnlyList<CollectedItem>> CollectDrupal(string? imageSelector = null)
+    {
+        var handler = new StubHttpHandler()
+            .MapFile("https://news.example/article/1", "Fixtures/html/drupal-article-with-og.html", "text/html")
+            .MapFile("https://news.example/article/2", "Fixtures/html/drupal-article-site-og.html", "text/html")
+            .MapFile("https://news.example/", "Fixtures/html/drupal-list.html", "text/html");
+        var fetcher = new PoliteHttpFetcher(new HttpClient(handler), new HostThrottle(new FakeTimeProvider(), TimeSpan.Zero));
+        var config = new HtmlSourceConfig("https://news.example/", "div.field-content > h3", "a", ImageSelector: imageSelector);
+        var source = new Source { Type = SourceType.Html, Url = config.ListUrl, Config = JsonSerializer.Serialize(config, JsonSerializerOptions.Web) };
+        return await new HtmlCollector(fetcher).CollectAsync(source, default);
+    }
+
+    [Fact]
+    public async Task Without_image_selector_takes_the_share_image_and_article_photos_but_not_logos_icons_or_counters()
+    {
+        var items = await CollectDrupal();
+        Assert.Equal(
+            ["https://news.example/sites/default/files/2026-11/skver.jpg", "https://news.example/sites/default/files/inline-images/detskaya-zona.jpg"],
+            items[0].ImageUrls);
+    }
+
+    [Fact]
+    public async Task Site_wide_share_image_is_not_taken_for_an_article()
+    {
+        var items = await CollectDrupal();
+        Assert.Equal(["https://news.example/sites/default/files/inline-images/doroga.jpg"], items[1].ImageUrls);
+    }
+
+    [Fact]
+    public async Task Image_selector_when_set_still_decides_alone()
+    {
+        var items = await CollectDrupal(imageSelector: ".field--name-field-image img");
+        Assert.Equal(["https://news.example/sites/default/files/styles/large/public/2026-11/skver.jpg?itok=Ab12"], items[0].ImageUrls);
+    }
 }
+

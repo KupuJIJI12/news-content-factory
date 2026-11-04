@@ -61,6 +61,22 @@ public class PublishJobTests(PostgresFixture db) : PublicationTestBase(db)
         Assert.Equal((PublicationStatus.Published, "mid.1", Now, 1), (pub.Status, pub.ExternalMessageId, pub.PublishedAt!.Value, pub.Attempts));
         Assert.Equal(StoryStatus.Published, story.Status);
         Assert.Equal(("Заголовок", "Текст"), (publisher.Posts.Single().Title, publisher.Posts.Single().Body));
+        Assert.Null(publisher.Posts.Single().ChannelLink); // the channel has no public link yet
+    }
+
+    [Fact]
+    public async Task Post_carries_the_channel_link_when_the_channel_has_one()
+    {
+        var id = await ScheduledPublicationAsync();
+        await using (var ctx = Db.CreateContext())
+        {
+            var channel = await ctx.Channels.SingleAsync();
+            (channel.PublicName, channel.PublicUrl) = ("Отрадный Live", "https://max.ru/otradny");
+            await ctx.SaveChangesAsync();
+        }
+        var publisher = new ScriptedPublisher(_ => new PublishResult("mid.1"));
+        await RunAsync(id, publisher);
+        Assert.Equal(new PostChannelLink("Отрадный Live", "https://max.ru/otradny"), publisher.Posts.Single().ChannelLink);
     }
 
     [Fact]

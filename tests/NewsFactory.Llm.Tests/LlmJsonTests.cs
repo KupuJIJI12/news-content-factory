@@ -20,6 +20,28 @@ public class LlmJsonTests
     }
 
     [Fact]
+    public void Accepts_data_wrapped_in_schema_properties()
+    {
+        // Real GigaChat-2 answer: the data was put where a JSON schema keeps its field definitions.
+        var r = LlmJson.Parse<ScoringResult>("""
+            { "type": "object", "properties": { "score": 2, "reason": "Протокольное сообщение без практической пользы" } }
+            """);
+        Assert.True(r.Ok, string.Join("; ", r.Errors));
+        Assert.Equal((2, "Протокольное сообщение без практической пользы"), (r.Value!.Score, r.Value.Reason));
+    }
+
+    [Fact]
+    public void Schema_echo_is_reported_as_schema()
+    {
+        var r = LlmJson.Parse<ScoringResult>("""
+            { "type": "object", "properties": { "score": { "type": "integer", "minimum": 1, "maximum": 10 }, "reason": { "type": "string" } },
+              "required": [ "score", "reason" ] }
+            """);
+        Assert.False(r.Ok);
+        Assert.Contains(r.Errors, e => e.Contains("схем"));
+    }
+
+    [Fact]
     public void Out_of_range_score_is_error() =>
         Assert.False(LlmJson.Parse<ScoringResult>("""{"score": 11, "reason": "x"}""").Ok);
 
@@ -39,6 +61,38 @@ public class LlmJsonTests
     [Fact]
     public void Empty_fact_issues_are_ok() =>
         Assert.True(LlmJson.Parse<FactCheckResult>("""{"issues":[]}""").Ok);
+
+    [Fact]
+    public void Empty_object_means_no_fact_issues()
+    {
+        // Real GigaChat-2-Pro answer when the draft matches the sources.
+        var r = LlmJson.Parse<FactCheckResult>("{}");
+        Assert.True(r.Ok, string.Join("; ", r.Errors));
+        Assert.Empty(r.Value!.Issues);
+    }
+
+    [Fact]
+    public void Repairs_a_broken_ending_of_the_json()
+    {
+        // Real GigaChat-2-Pro answer on the retry: the object is closed with ")" instead of "}".
+        var r = LlmJson.Parse<FactCheckResult>("""{"issues":[{"claim":"Вода вернулась домой","problem":"Преувеличение масштаба события"}])""");
+        Assert.True(r.Ok, string.Join("; ", r.Errors));
+        Assert.Equal(("Вода вернулась домой", "Преувеличение масштаба события"), (r.Value!.Issues.Single().Claim, r.Value.Issues.Single().Problem));
+    }
+
+    [Theory]
+    [InlineData("{\"score\": 7, \"reason\": \"важно\"")]
+    [InlineData("""{"score": 7, "reason": "важно"]""")]
+    public void Closes_what_the_model_left_open(string raw)
+    {
+        var r = LlmJson.Parse<ScoringResult>(raw);
+        Assert.True(r.Ok, string.Join("; ", r.Errors));
+        Assert.Equal((7, "важно"), (r.Value!.Score, r.Value.Reason));
+    }
+
+    [Fact]
+    public void Repair_does_not_invent_missing_fields() =>
+        Assert.False(LlmJson.Parse<ScoringResult>("""{"score": 7""").Ok);
 
     [Fact]
     public void Not_json_is_error_with_message() =>

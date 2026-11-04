@@ -17,5 +17,8 @@ public class Source : Entity
     public DateTimeOffset? LastItemAt { get; set; }
     public int ConsecutiveFailures { get; set; }
     public string? LastError { get; set; }
+    /// <summary>Set when the moderator deletes the source: it disappears from the admin and is never collected,
+    /// but stays in the database so its items are not collected again and the seed does not bring it back.</summary>
+    public DateTimeOffset? DeletedAt { get; set; }
     public List<SourceCity> Cities { get; set; } = [];
 }

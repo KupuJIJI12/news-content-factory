@@ -1,6 +1,7 @@
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Configuration;
 using NewsFactory.Domain;
+using NewsFactory.Llm;
 using NewsFactory.TestSupport;
 
 namespace NewsFactory.Api.Tests;
@@ -28,11 +29,94 @@ public class SeedDataTests(PostgresFixture db)
         Assert.Equal(7, await read.Sources.CountAsync());
         Assert.Equal(3, (await read.Channels.SingleAsync()).DailyLimit);
         Assert.True((await read.Channels.SingleAsync()).IsEnabled);
-        Assert.Equal(5, await read.PromptTemplates.CountAsync());
+        Assert.Equal(6, await read.PromptTemplates.CountAsync());
         Assert.Equal("f1", (await read.LlmProviders.SingleAsync(p => p.Name == "YandexGPT")).Headers["OpenAI-Project"]);
         Assert.Equal("500000", (await read.AppSettings.SingleAsync(s => s.Key == "DailyTokenBudget")).Value);
         var city = await read.Cities.SingleAsync();
         Assert.Equal(("Отрадный", "Europe/Samara", 6), (city.Name, city.TimeZone, city.ScoreThreshold));
+    }
+
+    private async Task<NewsFactory.Domain.Entities.PromptTemplate> RewritePromptAsync(Action<NewsFactory.Infrastructure.NewsFactoryDbContext> change)
+    {
+        await db.ResetAsync();
+        await using (var ctx = db.CreateContext())
+        {
+            await SeedData.ApplyAsync(ctx, Config(), default);
+            change(ctx);
+            await ctx.SaveChangesAsync();
+        }
+        await using (var ctx = db.CreateContext()) await SeedData.ApplyAsync(ctx, Config(), default);
+        await using var read = db.CreateContext();
+        return await read.PromptTemplates.SingleAsync(p => p.Task == LlmTask.Rewrite && p.IsActive);
+    }
+
+    [Fact]
+    public async Task Untouched_built_in_prompt_is_upgraded_to_the_new_default()
+    {
+        var active = await RewritePromptAsync(ctx =>
+            ctx.PromptTemplates.Single(p => p.Task == LlmTask.Rewrite).Text = "старый встроенный текст {{city}} {{sources}} {{hint}}");
+        Assert.Equal((2, true), (active.Version, active.IsBuiltIn));
+        Assert.Equal(DefaultPrompts.Get(LlmTask.Rewrite), active.Text);
+        await using var read = db.CreateContext();
+        Assert.Equal(1, await read.PromptTemplates.CountAsync(p => p.Task == LlmTask.Rewrite && p.IsActive));
+    }
+
+    [Fact]
+    public async Task Prompt_written_by_the_editor_is_never_replaced()
+    {
+        var active = await RewritePromptAsync(ctx =>
+        {
+            ctx.PromptTemplates.Single(p => p.Task == LlmTask.Rewrite).IsActive = false;
+            ctx.PromptTemplates.Add(new NewsFactory.Domain.Entities.PromptTemplate
+                { Task = LlmTask.Rewrite, Version = 2, Text = "мой промпт {{city}} {{sources}} {{hint}}", IsActive = true });
+        });
+        Assert.Equal((2, "мой промпт {{city}} {{sources}} {{hint}}"), (active.Version, active.Text));
+    }
+
+    [Fact]
+    public async Task Rolling_back_to_an_older_built_in_version_is_respected()
+    {
+        var active = await RewritePromptAsync(ctx =>
+        {
+            ctx.PromptTemplates.Single(p => p.Task == LlmTask.Rewrite).Text = "старый встроенный текст {{city}} {{sources}} {{hint}}";
+            ctx.PromptTemplates.Add(new NewsFactory.Domain.Entities.PromptTemplate
+                { Task = LlmTask.Rewrite, Version = 2, Text = DefaultPrompts.Get(LlmTask.Rewrite), IsActive = false, IsBuiltIn = true });
+        });
+        Assert.Equal(1, active.Version);
+        await using var read = db.CreateContext();
+        Assert.Equal(2, await read.PromptTemplates.CountAsync(p => p.Task == LlmTask.Rewrite));
+    }
+
+    [Fact]
+    public async Task Fills_empty_channel_chat_id_from_config_and_enables_it()
+    {
+        await db.ResetAsync();
+        // First start without MAX_CHANNEL_CHAT_ID: the channel is created empty and disabled.
+        await using (var ctx = db.CreateContext()) await SeedData.ApplyAsync(ctx, Config(), default);
+        await using (var ctx = db.CreateContext()) await SeedData.ApplyAsync(ctx, Config(("MAX_CHANNEL_CHAT_ID", "-777")), default);
+
+        await using var read = db.CreateContext();
+        var channel = await read.Channels.SingleAsync();
+        Assert.Equal(("-777", true), (channel.ExternalChatId, channel.IsEnabled));
+    }
+
+    [Fact]
+    public async Task Does_not_overwrite_channel_chat_id_edited_in_ui()
+    {
+        await db.ResetAsync();
+        await using (var ctx = db.CreateContext()) await SeedData.ApplyAsync(ctx, Config(("MAX_CHANNEL_CHAT_ID", "-100")), default);
+        await using (var ctx = db.CreateContext())
+        {
+            var channel = await ctx.Channels.SingleAsync();
+            channel.ExternalChatId = "-200";
+            channel.IsEnabled = false;
+            await ctx.SaveChangesAsync();
+            await SeedData.ApplyAsync(ctx, Config(("MAX_CHANNEL_CHAT_ID", "-100")), default);
+        }
+
+        await using var read = db.CreateContext();
+        var saved = await read.Channels.SingleAsync();
+        Assert.Equal(("-200", false), (saved.ExternalChatId, saved.IsEnabled));
     }
 
     [Fact]
@@ -60,13 +144,14 @@ public class SeedDataTests(PostgresFixture db)
         await using (var ctx = db.CreateContext()) await SeedData.ApplyAsync(ctx, Config(("YANDEX_FOLDER_ID", "f1")), default);
         await using var read = db.CreateContext();
         var settings = await read.LlmTaskSettings.Include(s => s.Provider).ToDictionaryAsync(s => s.Task);
-        Assert.Equal(5, settings.Count);
+        Assert.Equal(6, settings.Count);
         Assert.All(settings.Values, s => Assert.Equal("GigaChat", s.Provider!.Name));
         Assert.Equal("GigaChat-2", settings[LlmTask.Relevance].Model);
         Assert.Equal("GigaChat-2", settings[LlmTask.Clustering].Model);
         Assert.Equal("GigaChat-2", settings[LlmTask.Scoring].Model);
         Assert.Equal("GigaChat-2-Max", settings[LlmTask.Rewrite].Model);
         Assert.Equal("GigaChat-2-Pro", settings[LlmTask.FactCheck].Model);
+        Assert.Equal("GigaChat-2-Pro", settings[LlmTask.SourceSetup].Model);
         Assert.Contains("GigaChat-3-Ultra", settings[LlmTask.Rewrite].Provider!.Models);
     }
 

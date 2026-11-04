@@ -2,6 +2,8 @@ using Hangfire;
 using Hangfire.PostgreSql;
 using Microsoft.EntityFrameworkCore;
 using NewsFactory.Api;
+using NewsFactory.Api.Admin;
+using NewsFactory.Api.Admin.Auth;
 using NewsFactory.Collection;
 using NewsFactory.Collection.Html;
 using NewsFactory.Collection.Http;
@@ -44,7 +46,8 @@ services.AddHangfire(h => h
     .UseSimpleAssemblyNameTypeSerializer()
     .UseRecommendedSerializerSettings()
     .UsePostgreSqlStorage(o => o.UseNpgsqlConnection(connectionString)));
-services.AddHangfireServer(o => o.WorkerCount = config.GetValue("Hangfire:WorkerCount", 4));
+if (config.GetValue("Hangfire:ServerEnabled", true))
+    services.AddHangfireServer(o => o.WorkerCount = config.GetValue("Hangfire:WorkerCount", 4));
 GlobalJobFilters.Filters.Add(new AutomaticRetryAttribute { Attempts = 2 });
 services.AddSingleton<IPipelineQueue, HangfirePipelineQueue>();
 services.AddSingleton<ICollectQueue, HangfireCollectQueue>();
@@ -68,7 +71,13 @@ services.AddHttpClient(LlmClientFactory.HttpClientName).AddStandardResilienceHan
     o.CircuitBreaker.SamplingDuration = TimeSpan.FromSeconds(180);
     o.TotalRequestTimeout.Timeout = TimeSpan.FromMinutes(5);
     o.Retry.MaxRetryAttempts = 2;
+    // 429 is handled by LlmThrottle with long pauses; quick automatic retries would only add to the burst.
+    o.Retry.ShouldHandle = args => ValueTask.FromResult(
+        args.Outcome.Result?.StatusCode != System.Net.HttpStatusCode.TooManyRequests
+        && Microsoft.Extensions.Http.Resilience.HttpClientResiliencePredicates.IsTransient(args.Outcome));
 });
+services.Configure<LlmThrottleOptions>(config.GetSection("Llm:Throttle"));
+services.AddSingleton<LlmThrottle>();
 services.AddSingleton<LlmClientFactory>();
 services.AddSingleton<ILlmClientResolver>(sp => sp.GetRequiredService<LlmClientFactory>());
 services.AddScoped<LlmBudgetGuard>();
@@ -87,6 +96,8 @@ services.AddTransient<IPublisher>(sp => sp.GetRequiredService<MaxPublisher>());
 services.AddScoped<PublicationService>();
 services.AddScoped<PublishJob>();
 
+services.AddAdmin(config);
+
 services.AddHealthChecks()
     .AddNpgSql(connectionString)
     .AddHangfire(_ => { });
@@ -98,6 +109,7 @@ using (var scope = app.Services.CreateScope())
     var db = scope.ServiceProvider.GetRequiredService<NewsFactoryDbContext>();
     await db.Database.MigrateAsync();
     await SeedData.ApplyAsync(db, config, CancellationToken.None);
+    await AdminUserSeeder.EnsureAdminAsync(db, config, app.Logger, CancellationToken.None);
 }
 
 app.Services.GetRequiredService<IRecurringJobManager>().AddOrUpdate<CollectDueSourcesJob>(
@@ -105,7 +117,7 @@ app.Services.GetRequiredService<IRecurringJobManager>().AddOrUpdate<CollectDueSo
 
 app.UseSerilogRequestLogging();
 app.MapHealthChecks("/health");
-if (app.Environment.IsDevelopment()) app.UseHangfireDashboard("/hangfire");
+app.MapAdmin();
 
 app.Run();
 
