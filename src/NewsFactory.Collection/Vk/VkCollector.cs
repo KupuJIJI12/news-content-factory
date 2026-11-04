@@ -17,16 +17,12 @@ public sealed class VkCollector(HttpClient http, IOptions<VkOptions> options) : 
     {
         var config = JsonSerializer.Deserialize<VkSourceConfig>(source.Config ?? "", JsonSerializerOptions.Web)
                      ?? throw new InvalidOperationException($"У источника {source.Name} нет конфигурации VK");
-        if (config.OwnerId is null)
-        {
-            var resolved = await CallAsync("utils.resolveScreenName", $"screen_name={Uri.EscapeDataString(config.ScreenName)}", ct);
-            if (resolved["type"]?.GetValue<string>() != "group")
-                throw new InvalidOperationException($"{config.ScreenName} — не сообщество VK");
-            config = config with { OwnerId = -resolved["object_id"]!.GetValue<long>() };
-            source.Config = JsonSerializer.Serialize(config, JsonSerializerOptions.Web);
-        }
-
-        var wall = await CallAsync("wall.get", $"owner_id={config.OwnerId}&count=20", ct);
+        // wall.get takes the short name itself; utils.resolveScreenName is not called because VK
+        // answers it with error 1051 for some service keys.
+        var wallOwner = config.OwnerId is { } ownerId
+            ? $"owner_id={ownerId}"
+            : $"domain={Uri.EscapeDataString(config.ScreenName)}";
+        var wall = await CallAsync("wall.get", $"{wallOwner}&count=20", ct);
         var result = new List<CollectedItem>();
         foreach (var post in wall["items"]!.AsArray().OfType<JsonObject>())
         {
@@ -61,7 +57,7 @@ public sealed class VkCollector(HttpClient http, IOptions<VkOptions> options) : 
         response.EnsureSuccessStatusCode();
         var json = JsonNode.Parse(await response.Content.ReadAsStringAsync(ct))!;
         if (json["error"] is JsonObject error)
-            throw new VkApiException(error["error_code"]?.GetValue<int>() ?? 0, error["error_msg"]?.GetValue<string>() ?? "");
+            throw new VkApiException(method, error["error_code"]?.GetValue<int>() ?? 0, error["error_msg"]?.GetValue<string>() ?? "");
         return json["response"]!;
     }
 
